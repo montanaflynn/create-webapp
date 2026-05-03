@@ -17,7 +17,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,26 +116,20 @@ function SignedInActions({ user }: { user: HeaderUser }) {
 
 function SignedOutActions() {
   const pathname = usePathname();
-  // On auth pages themselves, the sign-in/up CTAs would just self-link —
-  // keep the header minimal so those pages look focused.
-  const onAuthPage = AUTH_PATHS.has(pathname);
+  // On auth pages themselves, the sign-in/up CTAs would just self-link.
+  if (AUTH_PATHS.has(pathname)) return null;
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      <ThemeToggle />
-      {!onAuthPage && (
-        <>
-          <Link
-            href="/sign-in"
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-          >
-            Sign in
-          </Link>
-          <Link href="/sign-up" className={buttonVariants({ size: "sm" })}>
-            Get started
-          </Link>
-        </>
-      )}
+      <Link
+        href="/sign-in"
+        className={buttonVariants({ variant: "ghost", size: "sm" })}
+      >
+        Sign in
+      </Link>
+      <Link href="/sign-up" className={buttonVariants({ size: "sm" })}>
+        Get started
+      </Link>
     </div>
   );
 }

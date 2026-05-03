@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AxeReporter } from "@/components/axe-reporter";
 import { SiteHeader } from "@/components/site-header";
+import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,8 +46,11 @@ export default async function RootLayout({
         >
           <SiteHeader user={session?.user ?? null} />
           {children}
-          <footer className="border-t py-4 text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} create-webapp
+          <footer className="border-t">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 text-sm text-muted-foreground sm:px-6">
+              <span>© {new Date().getFullYear()} create-webapp</span>
+              <ThemeToggle />
+            </div>
           </footer>
           <Toaster richColors />
           <AxeReporter />
