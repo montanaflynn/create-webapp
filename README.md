@@ -69,22 +69,37 @@ curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/v1/notes
 
 Keys are issued per-user and carry one or more scopes (`notes:read`, `notes:write`, `tags:read`). The service layer (`src/lib/services/`) is the single source of truth — server actions, REST handlers, and the MCP server all sit on top of the same functions.
 
-## MCP
+## Use it from Claude Code (MCP)
 
-An MCP server is mounted at `POST /api/mcp` (Streamable HTTP transport). Point any MCP-compatible client (Claude Desktop, Claude Code, etc.) at the URL with a Bearer token; **no separate process to install or run**. See **`docs/MCP.md`** for client config snippets and the tool list.
+Once the dev server is running, you can let Claude Code read and write your notes for you over MCP. Setup is a one-time, three-step thing:
 
-```jsonc
-// ~/.claude.json
-{
-  "mcpServers": {
-    "create-webapp": {
-      "type": "http",
-      "url": "http://localhost:3000/api/mcp",
-      "headers": { "Authorization": "Bearer cwa_..." }
-    }
-  }
-}
-```
+1. **Make an API key.** Sign in at http://localhost:3000, go to **Settings → API keys**, click **Create**. Name it something like `claude-code`. Leave all three scopes checked (`notes:read`, `notes:write`, `tags:read`). Copy the secret on the reveal banner — you only see it once.
+
+2. **Drop the key into the gitignored slot.** From the repo root:
+
+   ```bash
+   cp .claude/settings.local.example.json .claude/settings.local.json
+   ```
+
+   Open `.claude/settings.local.json` and replace `cwa_paste_your_key_here` with the secret you just copied.
+
+3. **Restart Claude Code in this repo.** Run `/mcp` — you should see `create-webapp` under **Project MCPs** with status `connected`.
+
+That's it. Try a prompt:
+
+> *List my notes*
+
+Claude calls the `notes_list` tool and renders a formatted table. Other things that just work:
+
+> *Create a note titled "MCP smoke test" with content "this came from Claude" tagged mcp,test*
+>
+> *What's in my drone log idea note?*  ← Claude calls `notes_list` to find the id, then `notes_get`
+>
+> *List my notes tagged interview*  ← uses the `tag` filter
+
+For read-only research agents, generate a key with only `notes:read` and `tags:read` checked.
+
+**Behind the scenes:** an MCP server is mounted at `POST /api/mcp` inside the Next app (Streamable HTTP transport, same Bearer auth as REST, no separate process to install). The wiring is in committed `.mcp.json` referencing `${CWA_API_KEY}`; the secret lives only in your gitignored `settings.local.json`. See **`docs/MCP.md`** for the full reference (Claude Desktop config, tool list, scope model, OAuth as a future direction).
 
 ## Database
 

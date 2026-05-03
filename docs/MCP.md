@@ -8,27 +8,48 @@ The endpoint is mounted at `POST /api/mcp` inside the Next app — same process,
 
 ## Configure your client
 
-### Claude Code
+### Claude Code (this repo's default)
 
-Add to `~/.claude.json` or your project's `.claude/settings.json`:
+The wiring is already in `.mcp.json` at the repo root, project-scoped, committed:
 
-```json
+```jsonc
+// .mcp.json
 {
   "mcpServers": {
     "create-webapp": {
       "type": "http",
       "url": "http://localhost:3000/api/mcp",
-      "headers": {
-        "Authorization": "Bearer cwa_..."
-      }
+      "headers": { "Authorization": "Bearer ${CWA_API_KEY}" }
     }
   }
 }
 ```
 
+The `${CWA_API_KEY}` placeholder is wiring, not a secret. Each contributor supplies their own key via a gitignored file:
+
+1. Sign in to the dev app and go to **Settings → API keys → Create**. Give it a name like `claude-code` and leave all three scopes checked. Copy the secret on the one-time reveal panel — it isn't shown again.
+
+2. Copy the example into the gitignored slot:
+
+   ```bash
+   cp .claude/settings.local.example.json .claude/settings.local.json
+   ```
+
+3. Edit `.claude/settings.local.json` and paste the key:
+
+   ```jsonc
+   { "env": { "CWA_API_KEY": "cwa_..." } }
+   ```
+
+4. Restart Claude Code (or open a new session in this repo). Run `/mcp` — `create-webapp` should appear under "Project MCPs" with status `connected`.
+
+If it shows `failed: 401`, the env var didn't expand. Most common cause: dev server isn't running, port mismatch (`:3001` vs `:3000`), or the key is for the test database (`./pgdata-test`) instead of dev (`./pgdata`).
+
+For read-only agents, generate a key with only `notes:read` and `tags:read` checked — the same `.mcp.json` wiring works, the scope just narrows what the tools can do.
+
 ### Claude Desktop
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) — paste the key inline since Desktop doesn't read `.claude/settings.local.json`:
 
 ```json
 {
@@ -42,12 +63,6 @@ Add to `~/.claude.json` or your project's `.claude/settings.json`:
   }
 }
 ```
-
-### Get a key
-
-Settings → API keys → Create. Give it a name and the scopes you want. Copy the secret on the one-time reveal — it isn't shown again.
-
-For the agent's typical usage, all three scopes (`notes:read`, `notes:write`, `tags:read`) are reasonable. For read-only research agents, drop `notes:write`.
 
 ---
 
