@@ -4,9 +4,11 @@ import { desc, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { passkey, pendingEmailChange } from "@/lib/db/schema";
+import { listApiKeys } from "@/lib/services/api-keys";
 import { ProfileForm } from "./profile-form";
 import { PasswordForm } from "./password-form";
 import { PasskeysForm } from "./passkeys-form";
+import { ApiKeysForm } from "./api-keys-form";
 import { SettingsToasts } from "./settings-toasts";
 
 export default async function SettingsPage({
@@ -22,7 +24,7 @@ export default async function SettingsPage({
 
   const sp = await searchParams;
 
-  const [pendingRows, passkeyRows] = await Promise.all([
+  const [pendingRows, passkeyRows, apiKeyRows] = await Promise.all([
     db
       .select({
         newEmail: pendingEmailChange.newEmail,
@@ -39,6 +41,7 @@ export default async function SettingsPage({
       .from(passkey)
       .where(eq(passkey.userId, session.user.id))
       .orderBy(desc(passkey.createdAt)),
+    listApiKeys(session.user.id),
   ]);
   const pending = pendingRows[0];
   // Auto-clear stale rows from view (the row stays in DB until next change submit
@@ -75,6 +78,17 @@ export default async function SettingsPage({
             id: p.id,
             name: p.name,
             createdAt: p.createdAt ? p.createdAt.toISOString() : null,
+          }))}
+        />
+        <ApiKeysForm
+          keys={apiKeyRows.map((k) => ({
+            id: k.id,
+            name: k.name,
+            prefix: k.prefix,
+            scopes: k.scopes,
+            createdAt: k.createdAt.toISOString(),
+            lastUsedAt: k.lastUsedAt ? k.lastUsedAt.toISOString() : null,
+            revokedAt: k.revokedAt ? k.revokedAt.toISOString() : null,
           }))}
         />
       </div>
