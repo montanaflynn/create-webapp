@@ -120,6 +120,14 @@ In-process means tools call services directly (no HTTP self-loop). REST and MCP 
 
 `@modelcontextprotocol/sdk` is **pinned to an exact version**, not `^`. The spec is still moving; SDK bumps should be deliberate edits, not side effects of `npm update`.
 
+**Auth model is bearer + manual key paste, not OAuth — for now.** The MCP spec (revision 2025-06-18) defines an OAuth 2.1 flow on top of Streamable HTTP: server returns `401` with `WWW-Authenticate: Bearer realm=...` and authorization metadata, the client opens a browser for interactive consent, the server hands back a token, the client stores it. PayPal's hosted MCP at `mcp.paypal.com/mcp` works this way — `claude mcp add` with no headers is enough.
+
+We chose bearer + a per-user API key in `Settings → API keys` because it's ~150 lines of code we already own (table, hashing, scopes, revocation) and it covers the CI / scripted / power-user case at the same time as interactive Claude Code use. Adding OAuth would mean: an authorization endpoint (delegating to better-auth's session for the consent step), token issuance + refresh, dynamic client registration, an explicit consent UI naming the requested scopes, and the `WWW-Authenticate` dance on `/api/mcp` itself. Real ~200–400 LOC plus a UI, not a 5-minute thing.
+
+The right destination is **both**: bearer for CI / scripts / "I want to give my coworker read-only access for an hour", OAuth for interactive humans on a fresh machine where copy-pasting keys feels primitive. Project structure is already aligned for it — the MCP route's `requireApiUser(request)` would gain a sibling `requireOauthUser(request)` resolved by the same `assertScopes` downstream. Service layer doesn't change.
+
+Phase 8 candidate. Not on the immediate path; named here so future-us doesn't mistake the current shape for the final shape.
+
 ## Documentation expectations
 
 - `TUTORIAL.md` walks through how the template was built from scratch.

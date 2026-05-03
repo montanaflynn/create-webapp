@@ -134,3 +134,27 @@ The `tests/e2e/mcp.spec.ts` Playwright suite is the canonical regression coverag
 ## Versioning
 
 `@modelcontextprotocol/sdk` is **pinned to an exact version** in `package.json`. The MCP spec is still moving; we want bumps to be a deliberate edit, not a side effect of `npm update`. When upgrading: read the SDK changelog, run the e2e suite, update this doc if the wire shape changed.
+
+---
+
+## Future direction: OAuth on `/api/mcp`
+
+The MCP spec defines an OAuth 2.1 flow over Streamable HTTP. Instead of pasting a Bearer token, an end-user runs:
+
+```bash
+claude mcp add --transport http create-webapp --scope project http://localhost:3000/api/mcp
+```
+
+…and on first use, Claude Code follows a `WWW-Authenticate` redirect, opens a browser, the user signs in to the app interactively, grants the requested scopes on a consent screen, and Claude Code stores the resulting token. No `${CWA_API_KEY}`, no `.claude/settings.local.json`, no copy-paste.
+
+This is how PayPal's hosted MCP at `mcp.paypal.com/mcp` works — that's why their config snippet doesn't show a header.
+
+We're staying on bearer + manual key for v1 because:
+
+- It's ~150 lines we already own (the `api_key` table, hashing, scopes, revocation UI).
+- It covers CI / scripts / shared-with-coworker-for-an-hour use cases the same way it covers interactive use.
+- OAuth is a real chunk of work — authorization endpoint, token issuance + refresh, dynamic client registration, consent UI, the full `WWW-Authenticate` dance. ~200–400 LOC plus a UI screen, not a 5-minute thing.
+
+The right end state is **both** — bearer for scripts and CI, OAuth for interactive humans on fresh machines where copy-pasting keys feels primitive. The architecture is already shaped for it: `requireApiUser(request)` would gain a sibling `requireOauthUser(request)`, both resolving to the same `VerifiedKey`-shape and feeding into the same `assertScopes` downstream. The service layer wouldn't change.
+
+If you're picking this up: implement on `/api/mcp` first (single endpoint, narrow surface), preserve bearer support throughout, and treat scopes consistently across both auth paths. See DECISIONS for the full rationale.
