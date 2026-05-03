@@ -96,6 +96,20 @@ Two cross-cutting safeties that came from real footguns:
 
 Better-auth's email hooks are called as `void mailer.send(...)` per their timing-attack guidance (awaiting the send leaks token-generation timing).
 
+## API-first: service layer + REST + API keys
+
+The template is API-first by construction: every domain operation lives in `src/lib/services/`, and every entry point (server actions, REST `/api/v1/*`, future CLI / MCP) is a thin adapter that authenticates → calls the service → translates errors. One Zod schema per operation, four call sites, no duplication.
+
+**Service layer** (`src/lib/services/{notes,tags,api-keys,errors}.ts`). Domain functions take `userId` + validated input and throw `NotFoundError` / `ValidationError` / `ForbiddenError` / `UnauthenticatedError`. They don't know whether they were called by a session cookie or a bearer token.
+
+**API keys: rolled custom, not the better-auth plugin.** better-auth 1.6.9 (current stable) doesn't ship an `apiKey` plugin — the `bearer` plugin only re-uses session tokens, which isn't what we want for long-lived service keys. ~150 lines of our own gets us a controlled schema, an explicit scopes model, and zero upstream-churn risk. Revisit if a stable plugin lands and our shape converges.
+
+**Scopes from day one**: `notes:read`, `notes:write`, `tags:read`. Today every key gets all three, but modeling scopes early forces every entry point to declare what it needs — no implicit privilege growth as new resources land.
+
+**Error envelope**: `{ error: { code, message, details? } }` with stable codes (`unauthenticated`, `forbidden`, `not_found`, `validation_failed`, `bad_request`, `internal_error`). Status mapping in `src/lib/api/response.ts` is the single place that knows about HTTP. CLI / MCP can read `code` and translate without parsing prose.
+
+**Last-used-at is fire-and-forget.** `verifyApiKey` updates `api_key.last_used_at` without awaiting — the auth check passed, the request shouldn't fail because of a bookkeeping write. Strict awaiting moves to Phase 7's audit log, where a missed row would actually matter.
+
 ## Documentation expectations
 
 - `TUTORIAL.md` walks through how the template was built from scratch.

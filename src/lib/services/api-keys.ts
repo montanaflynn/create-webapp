@@ -2,7 +2,12 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiKey } from "@/lib/db/schema";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthenticatedError,
+  ValidationError,
+} from "./errors";
 
 // The full set of scopes a key can hold. Every entry point into the system
 // (REST handlers, MCP tools, CLI commands) names one or more of these to
@@ -129,14 +134,14 @@ export async function revokeApiKey(userId: string, id: string): Promise<void> {
  */
 export async function verifyApiKey(secret: string): Promise<VerifiedKey> {
   if (typeof secret !== "string" || !secret.startsWith(KEY_PREFIX)) {
-    throw new ForbiddenError("Invalid API key.");
+    throw new UnauthenticatedError("Invalid API key.");
   }
   const hash = sha256(secret);
   const [row] = await db
     .select()
     .from(apiKey)
     .where(and(eq(apiKey.hash, hash), isNull(apiKey.revokedAt)));
-  if (!row) throw new ForbiddenError("Invalid API key.");
+  if (!row) throw new UnauthenticatedError("Invalid API key.");
 
   const expected = Buffer.from(row.hash, "hex");
   const presented = Buffer.from(hash, "hex");
@@ -144,7 +149,7 @@ export async function verifyApiKey(secret: string): Promise<VerifiedKey> {
     expected.length !== presented.length ||
     !timingSafeEqual(expected, presented)
   ) {
-    throw new ForbiddenError("Invalid API key.");
+    throw new UnauthenticatedError("Invalid API key.");
   }
 
   // Best-effort timestamp update; failure here must not block the request.

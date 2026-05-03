@@ -52,8 +52,21 @@ The application code (`src/lib/data` if added, server actions, pages) is identic
 | `/tags`                         | Index of every tag the user has used, with note counts; links into `/dashboard?tag=…`     |
 | `/settings`                     | Profile name + password forms                                                             |
 | `/api/auth/[...all]`            | better-auth handler                                                                       |
+| `/api/v1/notes`                 | REST: `GET` (list with `?tag&sort&dir&page&pageSize`), `POST` (create). Bearer-token auth |
+| `/api/v1/notes/[id]`            | REST: `GET`, `PATCH`, `DELETE`. Bearer-token auth                                         |
+| `/api/v1/tags`                  | REST: `GET` — every tag the user has used, with note counts. Bearer-token auth            |
 
 `/dashboard/*`, `/tags/*`, and `/settings/*` are protected by `src/proxy.ts` (cookie presence check) and re-checked inside `(app)/layout.tsx` (real session lookup, also gives the layout the user object).
+
+## API
+
+The same operations exposed through the dashboard are available over HTTP at `/api/v1/*` for CLIs, MCP servers, and other automation. See **`docs/API.md`** for the full reference.
+
+```bash
+curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/v1/notes
+```
+
+Keys are issued per-user and carry one or more scopes (`notes:read`, `notes:write`, `tags:read`). The service layer (`src/lib/services/`) is the single source of truth — server actions, REST handlers, and the upcoming CLI / MCP all sit on top of the same functions.
 
 ## Database
 
@@ -145,11 +158,13 @@ The notes CRUD is the pattern to copy. To swap "notes" → "drone logs" (or what
 
 1. **Schema**: rename `note` in `src/lib/db/schema.ts`, add/remove columns, then `npm run db:generate && npm run db:migrate`. Keep `tag` + `note_tag` if you still want a many-to-many faceting concept (or rename them to match the domain).
 2. **Zod schema**: rename `src/lib/notes-schema.ts` and update fields. Both the client form and the server actions import this — single source of truth.
-3. **Server actions** (`src/app/(app)/dashboard/actions.ts`): rename `createNote` / `updateNote` / `deleteNote`. Keep the `eq(table.userId, userId)` filter in every write — that's the authorization boundary. Keep create + delete + update all redirecting (create → list, update → read view, delete → list).
-4. **Suggestion query** (`src/lib/notes-queries.ts`): plain `SELECT ... ORDER BY name` against the tag table.
-5. **Editor** (`src/app/(app)/dashboard/notes/note-editor.tsx`): one shared component for create + edit. Update the field set, pass `cancelHref` per call site, keep `useTransition` for the submit, keep `disabled={pending}` (do **not** add `!isDirty`).
-6. **Pages**: `dashboard/page.tsx` for the list (preserves the URL-as-state plumbing for view/sort/page/tag), `notes/new/page.tsx` for create, `notes/[id]/page.tsx` for the read view, `notes/[id]/edit/page.tsx` for the edit form. Wrap the edit page's server action so the editor's `onSubmit` shape stays generic. Note `params: Promise<{ id: string }>` — Next 16.
-7. **Top-nav** (`src/components/app-header.tsx`): add or rename entries in the `nav` array.
+3. **Service layer** (`src/lib/services/notes.ts`, `src/lib/services/tags.ts`): rename the domain functions and return types. This is where the `eq(table.userId, userId)` filter lives — the authorization boundary. Server actions, REST routes, CLI, and MCP all call these.
+4. **Server actions** (`src/app/(app)/dashboard/actions.ts`): the thin adapter — get session, call service, `revalidatePath` + `redirect`. Keep create → list, update → read view, delete → list.
+5. **REST routes** (`src/app/api/v1/`): one route file per resource. Each handler calls `requireApiUser(request, [scopes])`, calls the service, and returns JSON. Errors are mapped centrally in `src/lib/api/response.ts`.
+6. **Tag suggestions** (`src/lib/services/tags.ts`): `listTagSuggestions` for autocomplete, `listTagsWithCounts` for the `/tags` page.
+7. **Editor** (`src/app/(app)/dashboard/notes/note-editor.tsx`): one shared component for create + edit. Update the field set, pass `cancelHref` per call site, keep `useTransition` for the submit, keep `disabled={pending}` (do **not** add `!isDirty`).
+8. **Pages**: `dashboard/page.tsx` for the list (preserves the URL-as-state plumbing for view/sort/page/tag), `notes/new/page.tsx` for create, `notes/[id]/page.tsx` for the read view, `notes/[id]/edit/page.tsx` for the edit form. Wrap the edit page's server action so the editor's `onSubmit` shape stays generic. Note `params: Promise<{ id: string }>` — Next 16.
+9. **Top-nav** (`src/components/app-header.tsx`): add or rename entries in the `nav` array.
 
 ## Things to know (gotchas hit while building this)
 

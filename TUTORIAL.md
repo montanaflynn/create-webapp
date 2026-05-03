@@ -1587,6 +1587,170 @@ Should pass with no `PGlite failed to initialize properly` errors. If you see th
 
 ---
 
+## 12. API-first: service layer, API keys, REST
+
+The dashboard is a great target for human users. Agents and CLIs need the same operations over HTTP. Bolting a REST layer next to the existing server actions means duplicating validation, normalization, and authorization in two places — drift bait.
+
+**The lever** is extracting a service layer first. Then every entry point (server actions, REST, future CLI / MCP) becomes a thin adapter that authenticates → calls the service → translates errors. One Zod schema, one `eq(table.userId, userId)` filter, four call sites.
+
+### 12.1 Service layer (`src/lib/services/`)
+
+Domain functions take a `userId` plus validated input and throw `NotFoundError` / `ValidationError` / `ForbiddenError` / `UnauthenticatedError`. They don't know whether they were called by a session cookie or a bearer token.
+
+```ts
+// src/lib/services/notes.ts
+export async function createNote(userId: string, input: unknown): Promise<Note> {
+  const { title, content, tags } = parseAndNormalize(input);
+  const noteId = crypto.randomUUID();
+  await db.transaction(async (tx) => {
+    await tx.insert(note).values({ id: noteId, userId, title, content });
+    if (tags.length > 0) await upsertTagsAndLink(tx, userId, noteId, tags);
+  });
+  return getNote(userId, noteId);
+}
+```
+
+`getNote` throws `NotFoundError`; `findNote` returns `null`. Pages use `findNote` (and call Next's `notFound()`); REST handlers use `getNote` (and let `mapError` produce a 404 JSON response).
+
+After the move, `src/app/(app)/dashboard/actions.ts` shrinks to ~50 lines:
+
+```ts
+"use server";
+export async function createNote(input: NoteInput) {
+  const userId = await requireUserId();
+  try {
+    await notes.createNote(userId, input);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+```
+
+Pages (`dashboard/page.tsx`, `notes/[id]/page.tsx`, `notes/[id]/edit/page.tsx`, `notes/new/page.tsx`, `tags/page.tsx`) drop direct Drizzle imports — they call `listNotes`, `findNote`, `listTagSuggestions`, `listTagsWithCounts` instead.
+
+### 12.2 API keys (`src/lib/services/api-keys.ts`)
+
+better-auth 1.6.9 doesn't ship an `apiKey` plugin (the `bearer` plugin only re-uses session tokens). ~150 lines of our own gets us the right schema and a scopes model.
+
+```ts
+export const apiKey = pgTable(
+  "api_key",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull(),         // visible: "cwa_a1b2c3d4"
+    hash: text("hash").notNull(),             // sha256 of the full secret
+    scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (t) => [
+    index("api_key_user_id_idx").on(t.userId),
+    uniqueIndex("api_key_hash_uniq").on(t.hash),
+  ],
+);
+```
+
+The full secret format is `cwa_<32 random base64url bytes>`. We store SHA-256 of the secret and look up by hash directly — the secret entropy is preserved through the hash, so a `WHERE hash = ?` index lookup is not a timing-attack vector. We still call `timingSafeEqual` on the hash bytes for defense in depth.
+
+```ts
+export async function verifyApiKey(secret: string): Promise<VerifiedKey> {
+  if (!secret.startsWith("cwa_")) throw new UnauthenticatedError("Invalid API key.");
+  const hash = sha256(secret);
+  const [row] = await db.select().from(apiKey)
+    .where(and(eq(apiKey.hash, hash), isNull(apiKey.revokedAt)));
+  if (!row) throw new UnauthenticatedError("Invalid API key.");
+  // ...timingSafeEqual check, fire-and-forget lastUsedAt update...
+  return { apiKeyId: row.id, userId: row.userId, scopes: row.scopes };
+}
+```
+
+**Scopes from day one**: `notes:read`, `notes:write`, `tags:read`. Every key currently gets all three at creation, but the model forces every entry point to declare what it needs — no implicit privilege growth as new resources land.
+
+```ts
+export const SCOPES = ["notes:read", "notes:write", "tags:read"] as const;
+export function assertScopes(verified: VerifiedKey, required: Scope[]): void {
+  const held = new Set(verified.scopes);
+  const missing = required.filter((s) => !held.has(s));
+  if (missing.length > 0) throw new ForbiddenError(`Missing scope: ${missing.join(", ")}`);
+}
+```
+
+### 12.3 REST handlers (`src/app/api/v1/`)
+
+Two adapter files mediate between Web `Request`/`Response` and the service layer:
+
+```ts
+// src/lib/api/auth.ts
+export async function requireApiUser(request: Request, required: Scope[] = []) {
+  const header = request.headers.get("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) throw new UnauthenticatedError("...");
+  const verified = await verifyApiKey(header.slice(7).trim());
+  if (required.length > 0) assertScopes(verified, required);
+  return verified;
+}
+```
+
+```ts
+// src/lib/api/response.ts
+export function mapError(e: unknown): Response {
+  if (e instanceof UnauthenticatedError) return jsonError(401, "unauthenticated", e.message);
+  if (e instanceof ForbiddenError) return jsonError(403, "forbidden", e.message);
+  if (e instanceof NotFoundError) return jsonError(404, "not_found", e.message);
+  if (e instanceof ValidationError) return jsonError(422, "validation_failed", e.message, { issues: e.issues });
+  console.error("[api] unhandled error:", e);
+  return jsonError(500, "internal_error", "Internal server error.");
+}
+```
+
+Route handlers are then trivial:
+
+```ts
+// src/app/api/v1/notes/route.ts
+export async function POST(request: Request) {
+  try {
+    const auth = await requireApiUser(request, ["notes:write"]);
+    let body: unknown;
+    try { body = await request.json(); }
+    catch { return jsonError(400, "bad_request", "Request body must be valid JSON."); }
+    const note = await createNote(auth.userId, body);
+    return Response.json(serializeNote(note), { status: 201 });
+  } catch (e) { return mapError(e); }
+}
+```
+
+The error envelope (`{ error: { code, message, details? } }`) and stable codes (`unauthenticated`, `forbidden`, `not_found`, `validation_failed`, `bad_request`, `internal_error`) are the contract. CLI / MCP clients can read `code` without parsing prose. See `docs/API.md` for the full reference.
+
+### 12.4 e2e coverage with seeded keys
+
+PGlite locks `pgdata-test` per-process — the test runner can't import the service while the dev server holds the directory. The workaround is to seed test keys *before* the dev server starts. `scripts/seed-test-api-keys.ts` runs from `globalSetup` after `db:seed`, creates three keys (`test-full`, `test-readonly`, `test-no-scope`) for the seeded user, and writes the plaintext secrets to `tests/e2e/.api-keys.json` (gitignored).
+
+The REST spec reads that file in `beforeAll` and exercises:
+
+- `401` on missing Authorization, invalid bearer
+- `403` on insufficient scope, read-only key writing
+- Full lifecycle: create → list → get → filter by tag → update → delete → 404 after delete
+- `422` validation with issue details
+- `200` on `GET /api/v1/tags`
+
+`npm run test:e2e` covers all 11 specs (4 browser + 7 REST) in ~17s.
+
+### 12.5 What this sets up
+
+The service layer is the primitive. The next entry points sit on top of it without re-implementing anything:
+
+- **Settings UI** for managing keys (one server-actioned page; create, list, revoke) — exercises the same `createApiKey` / `revokeApiKey` already in place.
+- **CLI** (`scripts/cli.ts`, single `tsx` file): `cwa notes list`, `cwa notes create`, etc. Reads a key from `~/.config/create-webapp` or `CWA_API_KEY`, hits the REST API.
+- **MCP server**: thin wrapper that exposes each REST endpoint as a tool, schemas converted from the same Zod definitions.
+- **Audit log + rate limiting**: the service layer is the single insertion point. Instrument once, all four entry points covered.
+
+---
+
 ## Gotchas summary (the things that bit us)
 
 1. **Next 16: `middleware.ts` → `proxy.ts`.** File rename, function rename, codemod available.
@@ -1628,7 +1792,7 @@ Should pass with no `PGlite failed to initialize properly` errors. If you see th
 
 ## What's intentionally NOT in this template
 
-- Email sending (verification, password reset, magic links)
 - OAuth providers (GitHub, Google) — easy to add via `socialProviders` in `auth.ts`
-- A repository/data-access layer (server actions call drizzle directly). Add `src/lib/data/` if your project gets big enough that you want app code free of drizzle imports.
-- Tests, observability, rate limiting, sessions-list management — all reasonable next steps once you have a real domain.
+- An API-key management UI. Keys can be created via the e2e seed script today; a full settings page lands in Phase 4.
+- A CLI and MCP server. The REST API is in place; both are thin adapters on top — see chapter 12.5.
+- Audit log, rate limiting, observability, sessions-list management — all reasonable next steps once you have a real domain. The service layer is the right insertion point for all of them.

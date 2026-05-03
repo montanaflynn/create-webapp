@@ -25,6 +25,15 @@ export class ValidationError extends Error {
   }
 }
 
+/** The caller did not authenticate (no key, invalid key, revoked key). HTTP 401. */
+export class UnauthenticatedError extends Error {
+  constructor(message = "Unauthenticated") {
+    super(message);
+    this.name = "UnauthenticatedError";
+  }
+}
+
+/** The caller authenticated but lacks the required capability. HTTP 403. */
 export class ForbiddenError extends Error {
   constructor(message = "Forbidden") {
     super(message);

@@ -22,6 +22,12 @@ async function globalSetup() {
 
   const { stdout: seedOut } = await execAsync("tsx scripts/seed.ts", { env });
   process.stdout.write(seedOut);
+
+  const { stdout: keysOut } = await execAsync(
+    "tsx scripts/seed-test-api-keys.ts",
+    { env },
+  );
+  process.stdout.write(keysOut);
 }
 
 export default globalSetup;
