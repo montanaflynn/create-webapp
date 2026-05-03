@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AxeReporter } from "@/components/axe-reporter";
+import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,11 +23,13 @@ export const metadata: Metadata = {
   description: "Next.js + better-auth + Drizzle + shadcn starter",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth.api.getSession({ headers: await headers() });
+
   return (
     <html
       lang="en"
@@ -38,6 +43,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <SiteHeader user={session?.user ?? null} />
           {children}
           <footer className="border-t py-4 text-center text-sm text-muted-foreground">
             © {new Date().getFullYear()} create-webapp

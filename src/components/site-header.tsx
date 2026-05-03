@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,6 +50,8 @@ const adminNav = {
   icon: ShieldIcon,
 } as const;
 
+const AUTH_PATHS = new Set(["/sign-in", "/sign-up", "/reset-password"]);
+
 function initialsOf(name: string) {
   return (
     name
@@ -60,10 +63,7 @@ function initialsOf(name: string) {
   );
 }
 
-export function AppHeader({ user }: { user: HeaderUser }) {
-  const pathname = usePathname();
-  const nav = user.role === "admin" ? [...baseNav, adminNav] : baseNav;
-
+export function SiteHeader({ user }: { user: HeaderUser | null }) {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
@@ -73,35 +73,71 @@ export function AppHeader({ user }: { user: HeaderUser }) {
         >
           create-webapp
         </Link>
-        <nav aria-label="Main" className="flex items-center gap-1">
-          {nav.map((item) => {
-            const active =
-              pathname === item.href ||
-              pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  active
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                aria-current={active ? "page" : undefined}
-                aria-label={item.title}
-              >
-                <item.icon className="size-4 sm:mr-1.5" aria-hidden />
-                <span className="hidden sm:inline">{item.title}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="ml-auto">
-          <UserDropdown user={user} />
-        </div>
+        {user ? <SignedInActions user={user} /> : <SignedOutActions />}
       </div>
     </header>
+  );
+}
+
+function SignedInActions({ user }: { user: HeaderUser }) {
+  const pathname = usePathname();
+  const nav = user.role === "admin" ? [...baseNav, adminNav] : baseNav;
+
+  return (
+    <>
+      <nav aria-label="Main" className="flex items-center gap-1">
+        {nav.map((item) => {
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                active
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              aria-current={active ? "page" : undefined}
+              aria-label={item.title}
+            >
+              <item.icon className="size-4 sm:mr-1.5" aria-hidden />
+              <span className="hidden sm:inline">{item.title}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="ml-auto">
+        <UserDropdown user={user} />
+      </div>
+    </>
+  );
+}
+
+function SignedOutActions() {
+  const pathname = usePathname();
+  // On auth pages themselves, the sign-in/up CTAs would just self-link —
+  // keep the header minimal so those pages look focused.
+  const onAuthPage = AUTH_PATHS.has(pathname);
+
+  return (
+    <div className="ml-auto flex items-center gap-2">
+      <ThemeToggle />
+      {!onAuthPage && (
+        <>
+          <Link
+            href="/sign-in"
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            Sign in
+          </Link>
+          <Link href="/sign-up" className={buttonVariants({ size: "sm" })}>
+            Get started
+          </Link>
+        </>
+      )}
+    </div>
   );
 }
 
