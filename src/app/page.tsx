@@ -13,24 +13,29 @@ export default async function Home() {
       {session ? (
         <AppHeader user={session.user} />
       ) : (
-        <header className="flex h-14 w-full items-center justify-between px-6">
-          <Link href="/" className="font-semibold tracking-tight">
-            create-webapp
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
+        <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+          <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
             <Link
-              href="/sign-in"
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
+              href="/"
+              className="font-semibold tracking-tight whitespace-nowrap"
             >
-              Sign in
+              create-webapp
             </Link>
-            <Link
-              href="/sign-up"
-              className={buttonVariants({ size: "sm" })}
-            >
-              Get started
-            </Link>
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+              <Link
+                href="/sign-in"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/sign-up"
+                className={buttonVariants({ size: "sm" })}
+              >
+                Get started
+              </Link>
+            </div>
           </div>
         </header>
       )}
