@@ -46,3 +46,10 @@ next-env.d.ts
 
 # per-user agent config (skills/ and settings.json stay tracked)
 .claude/settings.local.json
+
+# playwright e2e
+/pgdata-test
+/.next-test
+/test-results
+/playwright-report
+/playwright/.cache
