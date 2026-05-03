@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 import { ChevronLeftIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { note } from "@/lib/db/schema";
+import { findNote } from "@/lib/services/notes";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
@@ -20,13 +18,9 @@ export default async function ViewNotePage({
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const n = await db.query.note.findFirst({
-    where: and(eq(note.id, id), eq(note.userId, session.user.id)),
-    with: { noteTags: { with: { tag: true } } },
-  });
+  const n = await findNote(session.user.id, id);
   if (!n) notFound();
 
-  const tags = n.noteTags.map((nt) => nt.tag.name).sort();
   const wasEdited = n.updatedAt.getTime() !== n.createdAt.getTime();
 
   return (
@@ -58,9 +52,9 @@ export default async function ViewNotePage({
         </div>
       </div>
 
-      {tags.length > 0 && (
+      {n.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
+          {n.tags.map((tag) => (
             <Badge
               key={tag}
               variant="secondary"

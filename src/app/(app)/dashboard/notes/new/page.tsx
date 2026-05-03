@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getTagSuggestions } from "@/lib/notes-queries";
+import { listTagSuggestions } from "@/lib/services/tags";
 import { createNote } from "../../actions";
 import { NoteEditor } from "../note-editor";
 
@@ -9,7 +9,7 @@ export default async function NewNotePage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const tagSuggestions = await getTagSuggestions(session.user.id);
+  const tagSuggestions = await listTagSuggestions(session.user.id);
 
   return (
     <>

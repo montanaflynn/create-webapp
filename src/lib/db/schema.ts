@@ -149,6 +149,33 @@ export const noteTagRelations = relations(noteTag, ({ one }) => ({
   tag: one(tag, { fields: [noteTag.tagId], references: [tag.id] }),
 }));
 
+// API keys for programmatic access (CLI, MCP, custom integrations). Stored
+// hashed — the full secret is shown only once at creation. `prefix` is the
+// visible label (e.g. `cwa_a1b2c3d4`) that lets users identify a key in the
+// UI without exposing the secret. `scopes` is a flat list of capability
+// strings ("notes:read", "notes:write", ...). `revokedAt` lets us soft-delete
+// without orphaning audit-log rows that reference this key.
+export const apiKey = pgTable(
+  "api_key",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull(),
+    hash: text("hash").notNull(),
+    scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (t) => [
+    index("api_key_user_id_idx").on(t.userId),
+    uniqueIndex("api_key_hash_uniq").on(t.hash),
+  ],
+);
+
 // One row per user with a pending email-change verification. Lets /settings
 // show "change to X pending — cancel" without re-querying better-auth's
 // internal verification table, and lets our custom confirmation page look up

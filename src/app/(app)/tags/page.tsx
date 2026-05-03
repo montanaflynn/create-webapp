@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { noteTag, tag } from "@/lib/db/schema";
+import { listTagsWithCounts } from "@/lib/services/tags";
 import {
   Empty,
   EmptyDescription,
@@ -15,16 +13,7 @@ export default async function TagsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const rows = await db
-    .select({
-      name: tag.name,
-      count: sql<number>`count(${noteTag.noteId})::int`,
-    })
-    .from(tag)
-    .leftJoin(noteTag, eq(noteTag.tagId, tag.id))
-    .where(eq(tag.userId, session.user.id))
-    .groupBy(tag.id, tag.name)
-    .orderBy(tag.name);
+  const rows = await listTagsWithCounts(session.user.id);
 
   return (
     <>

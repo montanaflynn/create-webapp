@@ -1,10 +1,8 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { note } from "@/lib/db/schema";
-import { getTagSuggestions } from "@/lib/notes-queries";
+import { findNote } from "@/lib/services/notes";
+import { listTagSuggestions } from "@/lib/services/tags";
 import type { NoteInput } from "@/lib/notes-schema";
 import { updateNote } from "../../../actions";
 import { NoteEditor } from "../../note-editor";
@@ -19,16 +17,11 @@ export default async function EditNotePage({
   if (!session) redirect("/sign-in");
 
   const [n, tagSuggestions] = await Promise.all([
-    db.query.note.findFirst({
-      where: and(eq(note.id, id), eq(note.userId, session.user.id)),
-      with: { noteTags: { with: { tag: true } } },
-    }),
-    getTagSuggestions(session.user.id),
+    findNote(session.user.id, id),
+    listTagSuggestions(session.user.id),
   ]);
 
   if (!n) notFound();
-
-  const tags = n.noteTags.map((nt) => nt.tag.name).sort();
 
   async function saveThisNote(input: NoteInput) {
     "use server";
@@ -42,7 +35,7 @@ export default async function EditNotePage({
         cardTitle="Edit note"
         cardDescription={`Last updated ${new Date(n.updatedAt).toLocaleString()}`}
         submitLabel="Save changes"
-        initialValues={{ title: n.title, content: n.content, tags }}
+        initialValues={{ title: n.title, content: n.content, tags: n.tags }}
         tagSuggestions={tagSuggestions}
         onSubmit={saveThisNote}
         cancelHref={`/dashboard/notes/${id}`}

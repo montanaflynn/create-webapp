@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { XIcon } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { note, noteTag, tag } from "@/lib/db/schema";
+import { listNotes, type NoteSort, type SortDir } from "@/lib/services/notes";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -15,7 +13,7 @@ import {
   EmptyHeader,
 } from "@/components/ui/empty";
 import { NoteCard } from "./note-card";
-import { NoteTable, type SortColumn, type SortDir } from "./note-table";
+import { NoteTable } from "./note-table";
 import { Pagination } from "./pagination";
 import { ViewToggle, type NotesView } from "./view-toggle";
 
@@ -43,70 +41,19 @@ export default async function DashboardPage({
     tag: tagParam,
   } = await searchParams;
   const view: NotesView = viewParam === "table" ? "table" : "card";
-  const sort: SortColumn =
+  const sort: NoteSort =
     sortParam === "title" || sortParam === "created" ? sortParam : "updated";
   const dir: SortDir = dirParam === "asc" ? "asc" : "desc";
   const tagFilter = tagParam?.trim() || null;
-
-  const sortColumn =
-    sort === "title"
-      ? note.title
-      : sort === "created"
-        ? note.createdAt
-        : note.updatedAt;
-
-  // When filtering by tag, fetch the matching note IDs first. The notes query
-  // then runs with `inArray(note.id, ids)` — keeps sort + pagination in SQL
-  // while letting Drizzle's relational query stay simple.
-  let filteredIds: string[] | null = null;
-  if (tagFilter) {
-    const matches = await db
-      .select({ noteId: noteTag.noteId })
-      .from(noteTag)
-      .innerJoin(tag, eq(tag.id, noteTag.tagId))
-      .where(
-        and(eq(tag.userId, session.user.id), eq(tag.name, tagFilter)),
-      );
-    filteredIds = matches.map((r) => r.noteId);
-  }
-
-  const total = filteredIds
-    ? filteredIds.length
-    : (
-        await db
-          .select({ total: sql<number>`count(*)::int` })
-          .from(note)
-          .where(eq(note.userId, session.user.id))
-      )[0].total;
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const requestedPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const page = Math.min(requestedPage, totalPages);
 
-  const whereClause = filteredIds
-    ? filteredIds.length === 0
-      ? sql`false` // tag exists but matches nothing in this user's notes
-      : and(eq(note.userId, session.user.id), inArray(note.id, filteredIds))
-    : eq(note.userId, session.user.id);
-
-  const rows = await db.query.note.findMany({
-    where: whereClause,
-    orderBy: dir === "asc" ? asc(sortColumn) : desc(sortColumn),
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
-    with: {
-      noteTags: { with: { tag: true } },
-    },
+  const { notes, total, page, totalPages } = await listNotes(session.user.id, {
+    tag: tagFilter,
+    sort,
+    dir,
+    page: requestedPage,
+    pageSize: PAGE_SIZE,
   });
-
-  const notes = rows.map((n) => ({
-    id: n.id,
-    title: n.title,
-    content: n.content,
-    createdAt: n.createdAt,
-    updatedAt: n.updatedAt,
-    tags: n.noteTags.map((nt) => nt.tag.name).sort(),
-  }));
 
   // Params we want pagination + sort links to carry forward.
   const preserve: Record<string, string> = {};
