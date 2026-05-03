@@ -25,6 +25,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@electric-sql/pglite": "^0.4.5",
     "@hookform/resolvers": "^5.2.2",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@tanstack/react-table": "^8.21.3",
     "better-auth": "^1.6.9",
     "class-variance-authority": "^0.7.1",

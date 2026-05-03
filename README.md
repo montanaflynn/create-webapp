@@ -55,6 +55,7 @@ The application code (`src/lib/data` if added, server actions, pages) is identic
 | `/api/v1/notes`                 | REST: `GET` (list with `?tag&sort&dir&page&pageSize`), `POST` (create). Bearer-token auth |
 | `/api/v1/notes/[id]`            | REST: `GET`, `PATCH`, `DELETE`. Bearer-token auth                                         |
 | `/api/v1/tags`                  | REST: `GET` — every tag the user has used, with note counts. Bearer-token auth            |
+| `/api/mcp`                      | Model Context Protocol over Streamable HTTP. Same Bearer auth + scopes as REST            |
 
 `/dashboard/*`, `/tags/*`, and `/settings/*` are protected by `src/proxy.ts` (cookie presence check) and re-checked inside `(app)/layout.tsx` (real session lookup, also gives the layout the user object).
 
@@ -66,7 +67,24 @@ The same operations exposed through the dashboard are available over HTTP at `/a
 curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/v1/notes
 ```
 
-Keys are issued per-user and carry one or more scopes (`notes:read`, `notes:write`, `tags:read`). The service layer (`src/lib/services/`) is the single source of truth — server actions, REST handlers, and the upcoming CLI / MCP all sit on top of the same functions.
+Keys are issued per-user and carry one or more scopes (`notes:read`, `notes:write`, `tags:read`). The service layer (`src/lib/services/`) is the single source of truth — server actions, REST handlers, and the MCP server all sit on top of the same functions.
+
+## MCP
+
+An MCP server is mounted at `POST /api/mcp` (Streamable HTTP transport). Point any MCP-compatible client (Claude Desktop, Claude Code, etc.) at the URL with a Bearer token; **no separate process to install or run**. See **`docs/MCP.md`** for client config snippets and the tool list.
+
+```jsonc
+// ~/.claude.json
+{
+  "mcpServers": {
+    "create-webapp": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp",
+      "headers": { "Authorization": "Bearer cwa_..." }
+    }
+  }
+}
+```
 
 ## Database
 

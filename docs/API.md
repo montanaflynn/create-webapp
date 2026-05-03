@@ -1,6 +1,6 @@
 # REST API (v1)
 
-Programmatic access to the same operations the web UI uses. Designed so a CLI or MCP server can sit on top with no extra business logic.
+Programmatic access to the same operations the web UI uses. The MCP server (see `docs/MCP.md`) is a peer adapter on top of the same service layer — both share auth, scopes, and error codes.
 
 Base URL: `http://localhost:3000` in dev, your deploy URL in prod.
 
@@ -8,7 +8,7 @@ Base URL: `http://localhost:3000` in dev, your deploy URL in prod.
 
 ## Authentication
 
-Every `/api/v1/*` request requires `Authorization: Bearer <key>`. Keys are created from the settings UI (Phase 4 — landing soon) or via the `seed-test-api-keys.ts` script during e2e setup. The full secret is shown **once** at creation; only the prefix (e.g. `cwa_a1b2c3d4`) appears in lists afterward.
+Every `/api/v1/*` request requires `Authorization: Bearer <key>`. Keys are created from **Settings → API keys** (or via the `seed-test-api-keys.ts` script during e2e setup). The full secret is shown **once** at creation; only the prefix (e.g. `cwa_a1b2c3d4`) appears in lists afterward.
 
 ```bash
 curl -H "Authorization: Bearer cwa_xxx..." \

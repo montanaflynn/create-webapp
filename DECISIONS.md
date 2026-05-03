@@ -110,6 +110,16 @@ The template is API-first by construction: every domain operation lives in `src/
 
 **Last-used-at is fire-and-forget.** `verifyApiKey` updates `api_key.last_used_at` without awaiting — the auth check passed, the request shouldn't fail because of a bookkeeping write. Strict awaiting moves to Phase 7's audit log, where a missed row would actually matter.
 
+## MCP: HTTP route, not a separate process
+
+The MCP server is mounted at `/api/mcp` inside the Next app, using `WebStandardStreamableHTTPServerTransport` from `@modelcontextprotocol/sdk`. Stateless mode (`sessionIdGenerator: undefined`) with `enableJsonResponse: true`.
+
+Rejected the stdio-server-as-subprocess pattern. End-user config drops from "install tsx, configure an absolute path, set env vars" to "URL plus a Bearer header." The MCP server stops being a thing the user runs and becomes part of the app's API surface — same shape as REST, same auth path, same scopes.
+
+In-process means tools call services directly (no HTTP self-loop). REST and MCP are **peers** on top of the service layer, not stacked. Same `requireApiUser`, same `assertScopes`, same error codes. Add a new resource → both adapters get it from the same change.
+
+`@modelcontextprotocol/sdk` is **pinned to an exact version**, not `^`. The spec is still moving; SDK bumps should be deliberate edits, not side effects of `npm update`.
+
 ## Documentation expectations
 
 - `TUTORIAL.md` walks through how the template was built from scratch.

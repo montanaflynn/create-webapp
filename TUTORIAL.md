@@ -1744,10 +1744,118 @@ The REST spec reads that file in `beforeAll` and exercises:
 
 The service layer is the primitive. The next entry points sit on top of it without re-implementing anything:
 
-- **Settings UI** for managing keys (one server-actioned page; create, list, revoke) — exercises the same `createApiKey` / `revokeApiKey` already in place.
+- **Settings UI** for managing keys (chapter 13).
+- **MCP server** (chapter 14).
 - **CLI** (`scripts/cli.ts`, single `tsx` file): `cwa notes list`, `cwa notes create`, etc. Reads a key from `~/.config/create-webapp` or `CWA_API_KEY`, hits the REST API.
-- **MCP server**: thin wrapper that exposes each REST endpoint as a tool, schemas converted from the same Zod definitions.
-- **Audit log + rate limiting**: the service layer is the single insertion point. Instrument once, all four entry points covered.
+- **Audit log + rate limiting**: the service layer is the single insertion point. Instrument once, every adapter covered.
+
+---
+
+## 13. Settings UI for API keys
+
+`src/app/(app)/settings/api-keys-form.tsx` is a section on the existing `/settings` page (alongside Profile, Password, Passkeys), with two server actions next to it in `api-keys-actions.ts`. The form: name input plus three scope checkboxes (`Read notes` / `Write notes` / `Read tags`) with their raw scope strings shown beneath. Submit calls `createApiKey` from the service layer; on success the action returns `{ ok: true, secret, key }` and the form renders an amber-bordered banner with the full secret and a Copy button. Once the user clicks "I've saved it", the banner disappears and only the prefix remains in the list. Revoke uses an `AlertDialog` confirm and soft-deletes via `revokedAt`.
+
+Two gotchas worth flagging:
+
+- **Form must wrap the whole `<Card>`**, not just `CardFooter`. Same trap as gotcha #25 — Card relies on its direct children being Header/Content/Footer.
+- **Don't use `field.name` from RHF as the input `id`**. Multiple forms on the same page (Profile and API keys both have a `name` field) end up with duplicate `id="name"`, which breaks `<label for>` association and `getByLabel` in tests. Hardcode unique ids: `id="api-key-name"`.
+
+---
+
+## 14. MCP server (`/api/mcp`)
+
+Modern MCP supports Streamable HTTP — clients connect to a URL with a Bearer header, no subprocess. That changes the deployment shape entirely. The MCP server stops being a thing the end user runs and becomes another adapter mounted *inside* the Next app, peer to REST.
+
+### 14.1 Install
+
+```bash
+npm install @modelcontextprotocol/sdk
+```
+
+Pin the version exactly (no caret) — the MCP spec is still moving, you want bumps to be deliberate.
+
+### 14.2 The route
+
+```ts
+// src/app/api/mcp/route.ts
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { requireApiUser } from "@/lib/api/auth";
+import { mapError } from "@/lib/api/response";
+import { buildMcpServer } from "@/lib/mcp/server";
+
+async function handle(request: Request): Promise<Response> {
+  let auth;
+  try { auth = await requireApiUser(request); }
+  catch (e) { return mapError(e); }
+
+  const server = buildMcpServer(auth);
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless
+    enableJsonResponse: true,
+  });
+  await server.connect(transport);
+  return transport.handleRequest(request);
+}
+
+export { handle as GET, handle as POST, handle as DELETE };
+```
+
+`WebStandardStreamableHTTPServerTransport` accepts a Web `Request` and returns a `Response`. No Express bridge, no Node http types, no body-parser. It just plugs into a Next Route Handler. Stateless (`sessionIdGenerator: undefined`) is the right default for tool-only servers.
+
+### 14.3 The tools
+
+`src/lib/mcp/server.ts` registers six tools mirroring the REST resources:
+
+```ts
+server.registerTool(
+  "notes_create",
+  {
+    description: "Create a new note. Returns the created note.",
+    inputSchema: noteInputSchema.shape,  // ← the Zod object's raw shape
+  },
+  async (args) =>
+    run(auth, ["notes:write"], async () =>
+      serializeNote(await createNote(auth.userId, args)),
+    ),
+);
+```
+
+Two things worth pointing out:
+
+- **`inputSchema: noteInputSchema.shape`**. The SDK wants a "Zod raw shape" (an object whose values are Zod schemas), not a wrapped `z.object({...})`. Same Zod definition that REST + server actions use — single source of truth.
+- **`run(auth, scopes, body)`** is a tiny helper that does `assertScopes`, runs the body, and translates errors into `CallToolResult` with `isError: true`. The result text is the same JSON envelope REST uses, so an agent that's seen one is fluent in the other.
+
+### 14.4 Client config
+
+End-user config is one block:
+
+```jsonc
+// ~/.claude.json
+{
+  "mcpServers": {
+    "create-webapp": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp",
+      "headers": { "Authorization": "Bearer cwa_..." }
+    }
+  }
+}
+```
+
+That's it. No `tsx`, no path config, no env wiring. See `docs/MCP.md` for Claude Desktop variant.
+
+### 14.5 Tests
+
+`tests/e2e/mcp.spec.ts` reuses the same seeded API keys the REST tests use (`tests/e2e/.api-keys.json`). Each spec opens with `initialize` to negotiate protocol version, then exercises the tool set:
+
+- 401 on missing / invalid bearer
+- `tools/list` returns the expected six names
+- `notes_list` returns user data
+- Full lifecycle: `notes_create` → `notes_get` → `notes_delete` → `notes_get` returns `not_found` tool error
+- Read-only key gets `forbidden` on write
+- Validation errors (SDK-level Zod input check) surface as tool errors
+
+All 21 e2e specs (browser + REST + MCP + settings) run together via `npm run test:e2e`.
 
 ---
 
@@ -1793,6 +1901,5 @@ The service layer is the primitive. The next entry points sit on top of it witho
 ## What's intentionally NOT in this template
 
 - OAuth providers (GitHub, Google) — easy to add via `socialProviders` in `auth.ts`
-- An API-key management UI. Keys can be created via the e2e seed script today; a full settings page lands in Phase 4.
-- A CLI and MCP server. The REST API is in place; both are thin adapters on top — see chapter 12.5.
+- A CLI. The REST API is in place; a single-file `tsx scripts/cli.ts` calling `/api/v1/*` is a small additive step.
 - Audit log, rate limiting, observability, sessions-list management — all reasonable next steps once you have a real domain. The service layer is the right insertion point for all of them.
