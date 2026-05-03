@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+// Smoke explicitly tests the sign-in flow itself, so it starts unauthed.
+// Other tests inherit the storageState saved by auth.setup.ts.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("sign in lands on dashboard", async ({ page }) => {
   await page.goto("/sign-in");
 

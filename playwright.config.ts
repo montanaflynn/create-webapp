@@ -1,8 +1,10 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3001;
 const BASE_URL = `http://localhost:${PORT}`;
 const TEST_AUTH_SECRET = "test-secret-32-chars-min-do-not-use-in-prod";
+const STORAGE_STATE = path.join(__dirname, "tests/e2e/.auth/user.json");
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -17,7 +19,19 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "setup",
+      testMatch: /.*\.setup\.ts$/,
+    },
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: STORAGE_STATE,
+      },
+      dependencies: ["setup"],
+      testIgnore: /.*\.setup\.ts$/,
+    },
   ],
   webServer: {
     command: `npm run dev -- -p ${PORT}`,
