@@ -51,11 +51,13 @@ function SignInForm() {
   // triggers the system passkey picker as an autofill suggestion. Safe to
   // call unconditionally — better-auth no-ops if there are no passkeys.
   //
-  // Side effect we suppress: when the explicit button or unmount aborts the
-  // autofill ceremony, the browser throws AbortError and better-auth's
-  // passkey client logs it via console.error. The new ceremony succeeds —
-  // the log is noise. We patch console.error for the page lifetime to drop
-  // exactly that one message, and restore on unmount.
+  // Side effect we suppress: better-auth's passkey client logs ceremony
+  // failures via console.error even when they're expected. AbortError fires
+  // when the explicit button or unmount aborts the autofill ceremony;
+  // NotSupportedError fires in headless browsers and on platforms without a
+  // passkey authenticator (also seen in Playwright's chromium). Neither is a
+  // real bug — we patch console.error for the page lifetime to drop both,
+  // and restore on unmount.
   useEffect(() => {
     if (
       typeof window === "undefined" ||
@@ -66,11 +68,10 @@ function SignInForm() {
     const origError = console.error;
     console.error = (...args: unknown[]) => {
       const [first, second] = args;
+      const errName = (second as { name?: string } | null)?.name;
       if (
         first === "[Better Auth] Error verifying passkey" &&
-        typeof second === "object" &&
-        second !== null &&
-        (second as { name?: string }).name === "AbortError"
+        (errName === "AbortError" || errName === "NotSupportedError")
       ) {
         return;
       }
