@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
-import { APP_NAME } from "@/lib/branding";
+import { APP_NAME, APP_DESCRIPTION } from "@/lib/branding";
 
 export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -11,9 +11,7 @@ export default async function Home() {
     <main className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-2xl text-center space-y-6">
         <h1 className="text-5xl font-bold tracking-tight">{APP_NAME}</h1>
-        <p className="text-xl text-muted-foreground">
-          Next.js 16 + better-auth + Drizzle + shadcn/ui starter.
-        </p>
+        <p className="text-xl text-muted-foreground">{APP_DESCRIPTION}</p>
         {!session && (
           <div className="flex gap-3 justify-center pt-2">
             <Link href="/sign-up" className={buttonVariants({ size: "lg" })}>
