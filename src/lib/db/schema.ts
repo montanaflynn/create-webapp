@@ -177,14 +177,77 @@ export const apiKey = pgTable(
   ],
 );
 
+// OAuth 2.1 (RFC 6749 + 7636 PKCE + 7591 DCR + 7009 revocation). Public
+// clients only — no client_secret column. Each `oauth_client` is created
+// dynamically via `/api/oauth/register`; registration is open per the MCP
+// spec, throttled per IP. Redirect URIs are validated at registration time
+// (localhost + https only) and matched exactly at authorize/token time.
+export const oauthClient = pgTable("oauth_client", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  redirectUris: jsonb("redirect_uris").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// One-shot authorization codes. Issued by the consent screen (signed-in
+// user clicks "Authorize"), exchanged at /api/oauth/token within 10 minutes.
+// `consumedAt` is set on first use — replay attempts after that throw
+// `invalid_grant`. PKCE is mandatory: every row has a code_challenge that
+// the token endpoint verifies against the presented code_verifier.
+export const oauthAuthCode = pgTable("oauth_auth_code", {
+  code: text("code").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClient.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  scopes: jsonb("scopes").$type<string[]>().notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  codeChallengeMethod: text("code_challenge_method").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+});
+
+// Issued access + refresh token pair. We store SHA-256 hashes only — the
+// plaintext (`oat_acc_...` / `oat_rfr_...`) is returned to the client once
+// at issuance and never stored. Refresh tokens are single-use: refreshing
+// nulls the old `refreshTokenHash` atomically and issues a new row.
+// `revokedAt` covers explicit RFC 7009 revocation and rotation.
+export const oauthToken = pgTable(
+  "oauth_token",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessTokenHash: text("access_token_hash").notNull(),
+    refreshTokenHash: text("refresh_token_hash"),
+    scopes: jsonb("scopes").$type<string[]>().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    refreshExpiresAt: timestamp("refresh_expires_at"),
+    revokedAt: timestamp("revoked_at"),
+    lastUsedAt: timestamp("last_used_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("oauth_token_access_hash_uniq").on(t.accessTokenHash),
+    index("oauth_token_user_id_idx").on(t.userId),
+  ],
+);
+
 // State-changing actions across every adapter (server actions, REST, MCP, CLI)
 // land here. `principalKind` discriminates the auth context (cookie session,
-// API key, OAuth token, ...). For "api_key" rows, `apiKeyId` points at the
-// verified key; the FK uses ON DELETE SET NULL so revoking a key never
+// API key, OAuth token). For "api_key" rows, `apiKeyId` points at the
+// verified key; for "oauth_token" rows, `oauthTokenId` points at the issued
+// token. Both FKs use ON DELETE SET NULL so revoking a credential never
 // destroys its audit trail. The CHECK constraint keeps principal_kind and
-// api_key_id in sync — Phase 8b will extend the union (oauth_token_id and a
-// new branch). `metadata` is freeform JSON for per-action context (e.g.
-// `{ fields: ["title"] }` on an update).
+// the credential FK columns in sync. `metadata` is freeform JSON for
+// per-action context (e.g. `{ fields: ["title"] }` on an update).
 export const auditLog = pgTable(
   "audit_log",
   {
@@ -193,6 +256,9 @@ export const auditLog = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     apiKeyId: text("api_key_id").references(() => apiKey.id, {
+      onDelete: "set null",
+    }),
+    oauthTokenId: text("oauth_token_id").references(() => oauthToken.id, {
       onDelete: "set null",
     }),
     action: text("action").notNull(),
@@ -208,8 +274,9 @@ export const auditLog = pgTable(
     check(
       "audit_log_principal_consistent",
       sql`
-        (principal_kind = 'session' AND api_key_id IS NULL) OR
-        (principal_kind = 'api_key' AND api_key_id IS NOT NULL)
+        (principal_kind = 'session'     AND api_key_id IS NULL     AND oauth_token_id IS NULL) OR
+        (principal_kind = 'api_key'     AND api_key_id IS NOT NULL AND oauth_token_id IS NULL) OR
+        (principal_kind = 'oauth_token' AND oauth_token_id IS NOT NULL AND api_key_id IS NULL)
       `,
     ),
   ],
