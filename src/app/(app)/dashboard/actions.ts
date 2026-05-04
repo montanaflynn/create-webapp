@@ -12,7 +12,7 @@ import type { NoteInput } from "@/lib/notes-schema";
 async function requireActor(): Promise<Actor> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) throw new Error("Unauthorized");
-  return { userId: session.user.id, apiKeyId: null };
+  return { userId: session.user.id, principal: { kind: "session" } };
 }
 
 export async function createNote(input: NoteInput) {

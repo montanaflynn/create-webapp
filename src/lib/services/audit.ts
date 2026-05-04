@@ -3,12 +3,21 @@ import { auditLog } from "@/lib/db/schema";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-// Identity of who is performing a state-changing operation. Cookie-session
-// callers (server actions) set apiKeyId to null; Bearer-authenticated callers
-// (REST, MCP, CLI) set it to the verified key id.
+// Discriminated principal — the auth context behind a state-changing call.
+// Cookie-session callers (server actions) are "session"; Bearer-authenticated
+// callers (REST, MCP, CLI) are "api_key" with the verified key id. The
+// "oauth_token" branch is reserved for Phase 8b — included now so the union
+// stays exhaustive at every match site, even though no adapter constructs one
+// yet (and the audit_log CHECK constraint would reject it until 8b adds the
+// oauth_token_id column).
+export type Principal =
+  | { kind: "session" }
+  | { kind: "api_key"; id: string }
+  | { kind: "oauth_token"; id: string };
+
 export type Actor = {
   userId: string;
-  apiKeyId: string | null;
+  principal: Principal;
 };
 
 export type AuditAction =
@@ -33,10 +42,13 @@ export async function recordAudit(
   action: AuditAction,
   resource: AuditResource,
 ): Promise<void> {
+  const apiKeyId =
+    actor.principal.kind === "api_key" ? actor.principal.id : null;
   await conn.insert(auditLog).values({
     id: crypto.randomUUID(),
     userId: actor.userId,
-    apiKeyId: actor.apiKeyId,
+    apiKeyId,
+    principalKind: actor.principal.kind,
     action,
     resourceType: resource.type,
     resourceId: resource.id,

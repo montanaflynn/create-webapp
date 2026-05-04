@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -9,6 +9,7 @@ import {
   jsonb,
   index,
   integer,
+  check,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -177,9 +178,12 @@ export const apiKey = pgTable(
 );
 
 // State-changing actions across every adapter (server actions, REST, MCP, CLI)
-// land here. `apiKeyId` is null for cookie-session writes, set for Bearer-token
-// writes — the FK uses ON DELETE SET NULL so revoking a key never destroys its
-// audit trail. `metadata` is freeform JSON for per-action context (e.g.
+// land here. `principalKind` discriminates the auth context (cookie session,
+// API key, OAuth token, ...). For "api_key" rows, `apiKeyId` points at the
+// verified key; the FK uses ON DELETE SET NULL so revoking a key never
+// destroys its audit trail. The CHECK constraint keeps principal_kind and
+// api_key_id in sync — Phase 8b will extend the union (oauth_token_id and a
+// new branch). `metadata` is freeform JSON for per-action context (e.g.
 // `{ fields: ["title"] }` on an update).
 export const auditLog = pgTable(
   "audit_log",
@@ -195,11 +199,19 @@ export const auditLog = pgTable(
     resourceType: text("resource_type").notNull(),
     resourceId: text("resource_id").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+    principalKind: text("principal_kind").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
     index("audit_log_user_id_idx").on(t.userId),
     index("audit_log_created_at_idx").on(t.createdAt),
+    check(
+      "audit_log_principal_consistent",
+      sql`
+        (principal_kind = 'session' AND api_key_id IS NULL) OR
+        (principal_kind = 'api_key' AND api_key_id IS NOT NULL)
+      `,
+    ),
   ],
 );
 

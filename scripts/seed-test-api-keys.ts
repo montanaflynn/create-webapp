@@ -44,7 +44,7 @@ async function main() {
   const out: Record<string, string> = {};
   for (const spec of SPECS) {
     const { secret } = await createApiKey(
-      { userId: u.id, apiKeyId: null },
+      { userId: u.id, principal: { kind: "session" } },
       spec,
     );
     out[spec.name] = secret;

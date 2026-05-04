@@ -21,6 +21,32 @@ const ACTION_LABELS: Record<string, string> = {
 
 const LIMIT = 50;
 
+type AuditRow = {
+  principalKind: string;
+  apiKeyId: string | null;
+  apiKeyName: string | null;
+};
+
+function renderSource(r: AuditRow) {
+  switch (r.principalKind) {
+    case "session":
+      return <Badge variant="outline">Web session</Badge>;
+    case "api_key":
+      return (
+        <Badge variant="secondary">
+          key: {r.apiKeyName ?? r.apiKeyId?.slice(0, 8) ?? "(revoked)"}
+        </Badge>
+      );
+    case "oauth_token":
+      // Phase 8b will replace this with a real client name lookup once the
+      // oauth_token table exists. The CHECK constraint prevents any row from
+      // landing here in 8a, but TypeScript still wants this branch.
+      return <Badge variant="secondary">oauth: (pending)</Badge>;
+    default:
+      return <Badge variant="outline">{r.principalKind}</Badge>;
+  }
+}
+
 export async function AuditLogSection({ userId }: { userId: string }) {
   const rows = await db
     .select({
@@ -30,6 +56,7 @@ export async function AuditLogSection({ userId }: { userId: string }) {
       resourceId: auditLog.resourceId,
       metadata: auditLog.metadata,
       createdAt: auditLog.createdAt,
+      principalKind: auditLog.principalKind,
       apiKeyId: auditLog.apiKeyId,
       apiKeyName: apiKey.name,
     })
@@ -80,16 +107,7 @@ export async function AuditLogSection({ userId }: { userId: string }) {
                       <td className="py-2 pr-4">
                         <span className="font-mono text-xs">{label}</span>
                       </td>
-                      <td className="py-2">
-                        {r.apiKeyId ? (
-                          <Badge variant="secondary">
-                            key:{" "}
-                            {r.apiKeyName ?? r.apiKeyId.slice(0, 8)}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Web session</Badge>
-                        )}
-                      </td>
+                      <td className="py-2">{renderSource(r)}</td>
                     </tr>
                   );
                 })}
