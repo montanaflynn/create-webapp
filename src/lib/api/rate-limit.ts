@@ -59,3 +59,28 @@ export const rateLimiter: RateLimiter = new InMemoryTokenBucket(
   CAPACITY,
   REFILL,
 );
+
+// Per-IP bucket for OAuth dynamic client registration. Registration is
+// rare and unauthenticated — separate from the per-credential bucket so
+// abusing /api/oauth/register can't drain a real user's budget. Tight
+// limits: 10 burst, 1 per minute sustained.
+export const dcrRateLimiter: RateLimiter = new InMemoryTokenBucket(
+  10,
+  1 / 60,
+);
+
+/**
+ * Best-effort client IP extraction. Behind a real proxy, `x-forwarded-for`
+ * is the first hop the proxy added. In dev (no proxy) it's missing and we
+ * fall back to a constant — fine, since dev isn't worth gaming.
+ */
+export function getClientIp(request: Request): string {
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = request.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
