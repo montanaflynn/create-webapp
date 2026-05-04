@@ -402,7 +402,7 @@ export async function revokeTokenById(actor: Actor, tokenId: string): Promise<vo
 }
 
 // ---------------------------------------------------------------------------
-// Listing for the Connected apps settings page
+// Listing for the MCP clients settings page
 
 export async function listConnectedApps(userId: string): Promise<ConnectedApp[]> {
   const rows = await db

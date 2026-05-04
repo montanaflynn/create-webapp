@@ -134,7 +134,7 @@ export default async function AuthorizePage({
               </span>
               . You can revoke this access any time from{" "}
               <span className="font-medium text-foreground">
-                Settings → Connected apps
+                Settings → MCP clients
               </span>
               .
             </p>

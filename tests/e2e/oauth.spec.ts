@@ -366,7 +366,7 @@ test.describe("OAuth — full authorization flow", () => {
 });
 
 test.describe("OAuth — settings & audit log", () => {
-  test("connected app appears in /settings/oauth-clients with revoke + audit row", async ({
+  test("mcp client appears in /settings/oauth-clients with revoke + audit row", async ({
     page,
     request,
   }) => {
@@ -405,7 +405,7 @@ test.describe("OAuth — settings & audit log", () => {
     ).json();
 
     // Use the token to drive a state-changing call so the audit log gets a
-    // row sourced from `oauth: <client>`.
+    // row sourced from `mcp: <client>`.
     const note = await request.post("/api/v1/notes", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
       data: {
@@ -422,11 +422,11 @@ test.describe("OAuth — settings & audit log", () => {
     await page.goto("/settings/oauth-clients");
     await expect(page.getByText(clientName)).toBeVisible();
 
-    // Visit /settings/activity — oauth source label.
+    // Visit /settings/activity — mcp source label.
     await page.goto("/settings/activity");
-    await expect(page.getByText(/^oauth:/)).toBeVisible();
+    await expect(page.getByText(/^mcp:/)).toBeVisible();
 
-    // Revoke via the connected-apps UI.
+    // Revoke via the MCP-clients UI.
     await page.goto("/settings/oauth-clients");
     await page
       .getByRole("button", { name: `Revoke ${clientName}` })

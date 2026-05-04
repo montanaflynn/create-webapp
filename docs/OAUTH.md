@@ -118,7 +118,7 @@ curl -sX POST http://localhost:3000/api/oauth/revoke \
   -d '{ "token": "oat_acc_..." }'
 ```
 
-The user-facing **Settings → Connected apps → Revoke** button calls a different code path (it knows the user's identity, so it records `oauth.token.revoke` to the audit log with a real actor; the RFC 7009 endpoint can't, since it's reachable without authentication).
+The user-facing **Settings → MCP clients → Revoke** button calls a different code path (it knows the user's identity, so it records `oauth.token.revoke` to the audit log with a real actor; the RFC 7009 endpoint can't, since it's reachable without authentication).
 
 ---
 

@@ -44,7 +44,7 @@ function renderSource(r: AuditRow) {
     case "oauth_token":
       return (
         <Badge variant="secondary">
-          oauth: {truncate(r.oauthClientName ?? r.oauthTokenId?.slice(0, 8) ?? "(revoked)")}
+          mcp: {truncate(r.oauthClientName ?? r.oauthTokenId?.slice(0, 8) ?? "(revoked)")}
         </Badge>
       );
     default:

@@ -38,7 +38,7 @@ export function ConnectedAppsList({
   if (apps.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No connected apps yet. Apps you authorize will appear here.
+        No MCP clients yet. Clients you authorize will appear here.
       </p>
     );
   }

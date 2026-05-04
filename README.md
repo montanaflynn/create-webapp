@@ -92,7 +92,7 @@ claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
 
 Run `/mcp` and pick **create-webapp**. Claude opens your browser; you sign in (passkey, password, whichever you have set up) and click **Authorize** on the consent screen naming the requested scopes. Done — Claude stores the access token and uses it from then on.
 
-Need to revoke? **Settings → Connected apps → Revoke**. Token dies immediately.
+Need to revoke? **Settings → MCP clients → Revoke**. Token dies immediately.
 
 That's it. Try a prompt:
 

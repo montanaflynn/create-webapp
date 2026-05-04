@@ -23,7 +23,7 @@ Run `/mcp` and pick **create-webapp**. Claude follows the `WWW-Authenticate` hea
 
 **No `Authorization` header in the config.** That's the whole point of OAuth on MCP — discovery + dynamic client registration + the consent flow replace the manual paste.
 
-Revoke at any time from **Settings → Connected apps**. The token dies immediately on the server side.
+Revoke at any time from **Settings → MCP clients**. The token dies immediately on the server side.
 
 See **`docs/OAUTH.md`** for the full endpoint reference (discovery URLs, register/authorize/token/revoke).
 
