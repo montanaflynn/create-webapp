@@ -82,27 +82,58 @@ npm run cli -- tags list
 
 Use `--json` on any read verb for clean piping into `jq`. See **`docs/CLI.md`** for the full reference.
 
-## Use it from Claude Code (MCP)
+## Use it from an MCP client
 
-Once the dev server is running, point Claude Code at the MCP endpoint and it'll handle authentication for you over OAuth — no key copy-paste, no config files.
+The MCP server at `/api/mcp` speaks the standard Streamable HTTP + OAuth flow, so any MCP-compliant client works. The settings page at **Settings → MCP clients** has copy-paste setup commands too.
+
+### Claude Code
 
 ```bash
 claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
 ```
 
-Run `/mcp` and pick **create-webapp**. Claude opens your browser; you sign in (passkey, password, whichever you have set up) and click **Authorize** on the consent screen naming the requested scopes. Done — Claude stores the access token and uses it from then on.
+Claude Code enables the server on add and triggers the OAuth flow on the first tool call: browser opens, you sign in, click **Authorize** on the consent screen naming the requested scopes, Claude stores the access token and uses it from then on.
+
+### Codex
+
+```bash
+codex mcp add create-webapp --url http://localhost:3000/api/mcp
+```
+
+Codex opens the browser immediately for the OAuth flow. After you Authorize, the token is stored in `~/.codex/config.toml` and the CLI + IDE extension share it.
+
+### OpenCode
+
+```bash
+opencode mcp add                          # interactive walkthrough
+opencode mcp auth create-webapp           # triggers the OAuth browser flow
+```
+
+`opencode mcp add` is interactive — it walks you through naming the server (`create-webapp`), picking **remote**, entering the URL (`http://localhost:3000/api/mcp`), and answering **Yes** to OAuth. That writes the config to `opencode.json`. The OAuth flow itself is a separate `opencode mcp auth` step that does dynamic client registration and stores the token at `~/.local/share/opencode/mcp-auth.json`.
+
+### Other clients (Cursor / Zed / Gemini CLI / Cline / etc.)
+
+[`add-mcp`](https://github.com/neondatabase/add-mcp) auto-detects installed MCP clients and writes the right config for each:
+
+```bash
+npx add-mcp http://localhost:3000/api/mcp
+```
+
+Supports 13+ clients (Antigravity, Claude Code, Claude Desktop, Cline, Codex, Cursor, Gemini CLI, Goose, GitHub Copilot CLI, MCPorter, OpenCode, VS Code, Zed). The OAuth handshake runs per-client on first tool call. (For Claude Code, Codex, and OpenCode the per-client commands above are usually quicker since they don't need the npx bootstrap.)
+
+### After setup
 
 Need to revoke? **Settings → MCP clients → Revoke**. Token dies immediately.
 
-That's it. Try a prompt:
+Try a prompt from any client:
 
 > *List my notes*
 
-Claude calls the `notes_list` tool and renders a formatted table. Other things that just work:
+The client calls the `notes_list` tool and renders a formatted table. Other things that just work:
 
 > *Create a note titled "MCP smoke test" with content "this came from Claude" tagged mcp,test*
 >
-> *What's in my drone log idea note?*  ← Claude calls `notes_list` to find the id, then `notes_get`
+> *What's in my drone log idea note?*  ← client calls `notes_list` to find the id, then `notes_get`
 >
 > *List my notes tagged interview*  ← uses the `tag` filter
 
@@ -111,8 +142,20 @@ Claude calls the `notes_list` tool and renders a formatted table. Other things t
 For non-interactive use cases (CI jobs, shell scripts, agents on a fresh machine where opening a browser isn't viable, or Claude Desktop which doesn't speak OAuth yet), generate a long-lived API key instead:
 
 1. Sign in, go to **Settings → API keys → Create**, copy the `cwa_...` secret on the reveal banner (shown once).
-2. `cp .claude/settings.local.example.json .claude/settings.local.json` and paste the key into `CWA_API_KEY`. The committed `.mcp.json` already references that env var.
-3. Restart Claude Code, run `/mcp`.
+2. Add an entry to your client's MCP config that passes the key as a Bearer header. For Claude Code (project-scoped via `.mcp.json`):
+   ```json
+   {
+     "mcpServers": {
+       "create-webapp": {
+         "type": "http",
+         "url": "http://localhost:3000/api/mcp",
+         "headers": { "Authorization": "Bearer ${CWA_API_KEY}" }
+       }
+     }
+   }
+   ```
+   Then `cp .claude/settings.local.example.json .claude/settings.local.json` and paste the key into `CWA_API_KEY`.
+3. Restart the client, run its MCP-list command (`/mcp` in Claude Code).
 
 Read-only agents can generate a key with only `notes:read` and `tags:read` checked. See **`docs/MCP.md`** and **`docs/OAUTH.md`** for the full references.
 

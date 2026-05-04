@@ -1,6 +1,6 @@
 # MCP server
 
-Lets agents (Claude Desktop, Claude Code, anything that speaks MCP) use this app's data.
+Lets agents (Claude Code, Codex, Claude Desktop — anything that speaks MCP) use this app's data.
 
 The endpoint is mounted at `POST /api/mcp` inside the Next app — same process, same service layer, same scopes as the REST API. There's **no separate process to install or run**.
 
@@ -19,7 +19,7 @@ Two auth paths are supported, in order of preference:
 claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
 ```
 
-Run `/mcp` and pick **create-webapp**. Claude follows the `WWW-Authenticate` header on the first 401, opens a browser, and the consent screen lists the requested scopes. Authorize → Claude stores the token → you're connected.
+Claude Code enables the server on add and triggers the OAuth flow on the first tool call: it follows the `WWW-Authenticate` header on the initial 401, opens a browser, and the consent screen lists the requested scopes. Authorize → Claude stores the token → you're connected.
 
 **No `Authorization` header in the config.** That's the whole point of OAuth on MCP — discovery + dynamic client registration + the consent flow replace the manual paste.
 
@@ -27,9 +27,67 @@ Revoke at any time from **Settings → MCP clients**. The token dies immediately
 
 See **`docs/OAUTH.md`** for the full endpoint reference (discovery URLs, register/authorize/token/revoke).
 
-### Claude Code via Bearer key (CI / scripted use)
+### Codex via OAuth
 
-The committed `.mcp.json` already wires the Bearer path:
+```bash
+codex mcp add create-webapp --url http://localhost:3000/api/mcp
+```
+
+Codex opens the browser immediately for the OAuth flow. After you click Authorize, the token is stored in `~/.codex/config.toml` and `codex mcp list` will show `create-webapp` as connected.
+
+The Codex CLI and Codex IDE extension share `~/.codex/config.toml`, so this one-time setup covers both.
+
+### OpenCode via OAuth
+
+```bash
+opencode mcp add                          # interactive walkthrough
+opencode mcp auth create-webapp           # triggers the OAuth browser flow
+```
+
+`opencode mcp add` is interactive (no `--url` or other flags — every value comes from prompts). Pick **remote**, name it `create-webapp`, enter `http://localhost:3000/api/mcp`, answer **Yes** to "requires OAuth". That writes the config to `opencode.json`.
+
+The OAuth handshake itself is a separate explicit step. `opencode mcp auth create-webapp` does RFC 7591 dynamic client registration, opens the browser for consent, and stores the resulting token at `~/.local/share/opencode/mcp-auth.json`.
+
+If you'd rather edit the config directly, drop this into `opencode.json` at the repo root:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "create-webapp": {
+      "type": "remote",
+      "url": "http://localhost:3000/api/mcp",
+      "oauth": {}
+    }
+  }
+}
+```
+
+The empty `"oauth": {}` is the magic — it tells OpenCode to discover OAuth from `WWW-Authenticate` rather than expecting a static Bearer header.
+
+### Other clients via OAuth (`npx add-mcp`)
+
+[`add-mcp`](https://github.com/neondatabase/add-mcp) is a Neon-maintained CLI that auto-detects installed MCP clients and writes the right config snippet for each:
+
+```bash
+npx add-mcp http://localhost:3000/api/mcp
+```
+
+Supports 13+ agents: Antigravity, Claude Code, Claude Desktop, Cline (CLI + VSCode), Codex, Cursor, Gemini CLI, Goose, GitHub Copilot CLI, MCPorter, OpenCode, VS Code, Zed. No `--header` needed for our server because OAuth discovery handles auth on its own. The handshake runs per-client on first tool call.
+
+For per-client commands or config-file snippets, see each client's own MCP setup docs — `add-mcp` is a convenience layer, not a requirement.
+
+### Bearer key (CI / scripted use, Claude Desktop)
+
+For non-interactive clients, generate a long-lived API key and paste it into the client's MCP config.
+
+1. **Settings → API keys → Create** in the dev app. Pick the scopes the agent actually needs (read-only agents only need `notes:read` + `tags:read`). Copy the `cwa_...` secret on the reveal banner — it isn't shown again.
+
+2. Add an entry to your client's MCP config that includes the Bearer header.
+
+#### Claude Code
+
+Project-scoped via `.mcp.json` at the repo root:
 
 ```jsonc
 // .mcp.json
@@ -44,29 +102,30 @@ The committed `.mcp.json` already wires the Bearer path:
 }
 ```
 
-To activate it:
+Then make the env var available to the project:
 
-1. **Settings → API keys → Create** in the dev app. Copy the `cwa_...` secret on the reveal banner — it isn't shown again.
+```bash
+cp .claude/settings.local.example.json .claude/settings.local.json
+# edit .claude/settings.local.json:
+# { "env": { "CWA_API_KEY": "cwa_..." } }
+```
 
-2. ```bash
-   cp .claude/settings.local.example.json .claude/settings.local.json
-   ```
+Restart Claude Code. Run `/mcp` — `create-webapp` should show `connected`. If it shows `failed: 401`, the env var didn't expand (dev server stopped, port mismatch, or the key is for the test database).
 
-3. Edit `.claude/settings.local.json`:
+#### Codex
 
-   ```jsonc
-   { "env": { "CWA_API_KEY": "cwa_..." } }
-   ```
+```toml
+# ~/.codex/config.toml
+[mcp_servers.create-webapp]
+url = "http://localhost:3000/api/mcp"
+bearer_token_env_var = "CWA_API_KEY"
+```
 
-4. Restart Claude Code. Run `/mcp` — `create-webapp` should show `connected`.
+Export `CWA_API_KEY` in the shell that launches Codex.
 
-If it shows `failed: 401`, the env var didn't expand. Most common cause: dev server isn't running, port mismatch, or the key is for the test database.
+#### Claude Desktop
 
-For read-only agents, create a key with only `notes:read` and `tags:read` checked.
-
-### Claude Desktop
-
-Claude Desktop's MCP client doesn't yet do OAuth, so paste a Bearer key inline at `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+Claude Desktop's MCP client doesn't yet do OAuth. Paste the Bearer key inline at `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ```json
 {
