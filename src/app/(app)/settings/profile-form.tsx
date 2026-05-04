@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
@@ -105,7 +105,7 @@ export function ProfileForm({
   }
 
   const { isSubmitting } = form.formState;
-  const watchedEmail = form.watch("email");
+  const watchedEmail = useWatch({ control: form.control, name: "email" });
   const emailWillChange =
     !pending &&
     watchedEmail.trim().length > 0 &&

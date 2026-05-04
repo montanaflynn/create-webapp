@@ -39,7 +39,7 @@ export default async function ConfirmEmailChangePage({
       body = invalid(
         "This confirmation link is no longer valid. The change may have already been confirmed, cancelled, or expired.",
       );
-    } else if (row.expiresAt.getTime() < Date.now()) {
+    } else if (isExpired(row.expiresAt)) {
       body = invalid(
         "This confirmation link has expired. Submit the change again from settings.",
       );
@@ -67,6 +67,10 @@ export default async function ConfirmEmailChangePage({
       <CardContent>{body}</CardContent>
     </Card>
   );
+}
+
+function isExpired(expiresAt: Date): boolean {
+  return expiresAt.getTime() < Date.now();
 }
 
 function invalid(msg: string) {

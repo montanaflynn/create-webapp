@@ -132,12 +132,15 @@ export function ApiKeysForm({ keys }: { keys: SerializedApiKey[] }) {
                   <div className="grid gap-2 sm:grid-cols-3">
                     {SCOPES.map((s) => {
                       const checked = field.value.includes(s.value);
+                      const checkboxId = `scope-${s.value.replace(/:/g, "-")}`;
                       return (
                         <label
                           key={s.value}
+                          htmlFor={checkboxId}
                           className="flex cursor-pointer items-start gap-2 rounded-md border p-3 text-sm has-[[data-checked]]:border-primary has-[[data-checked]]:bg-primary/5"
                         >
                           <Checkbox
+                            id={checkboxId}
                             checked={checked}
                             onCheckedChange={(next) => {
                               const set = new Set(field.value);

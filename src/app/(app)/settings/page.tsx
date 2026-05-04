@@ -46,8 +46,7 @@ export default async function SettingsPage({
   const pending = pendingRows[0];
   // Auto-clear stale rows from view (the row stays in DB until next change submit
   // or manual cancel, but we don't want to show an expired pending banner).
-  const pendingActive =
-    pending && pending.expiresAt.getTime() > Date.now() ? pending : null;
+  const pendingActive = pending && !isExpired(pending.expiresAt) ? pending : null;
 
   return (
     <>
@@ -94,4 +93,8 @@ export default async function SettingsPage({
       </div>
     </>
   );
+}
+
+function isExpired(expiresAt: Date): boolean {
+  return expiresAt.getTime() < Date.now();
 }

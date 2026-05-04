@@ -8,7 +8,6 @@ const url = process.env.DATABASE_URL?.trim() || "./pgdata";
 const isRemote = url.startsWith("postgres:") || url.startsWith("postgresql:");
 
 declare global {
-  // eslint-disable-next-line no-var
   var __pglite__: PGlite | undefined;
 }
 
