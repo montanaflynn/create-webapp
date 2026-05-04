@@ -110,6 +110,12 @@ The template is API-first by construction: every domain operation lives in `src/
 
 **Last-used-at is fire-and-forget.** `verifyApiKey` updates `api_key.last_used_at` without awaiting — the auth check passed, the request shouldn't fail because of a bookkeeping write. Strict awaiting moves to Phase 7's audit log, where a missed row would actually matter.
 
+## Principal model: discriminated union, three branches
+
+`type Principal = { kind: "session" } | { kind: "api_key", id } | { kind: "oauth_token", id }`. Lives in `src/lib/services/audit.ts`; carried in every `Actor` passed to a service function. The `audit_log` table mirrors it: `principal_kind` discriminates, `api_key_id` or `oauth_token_id` is set (mutually exclusive), and a CHECK constraint enforces the consistency in the database — defense in depth against application bugs that could otherwise insert a row claiming `principal_kind = 'session'` while pointing at a key.
+
+This is the type that makes the multi-authenticator shape sane. `requireApiUser` returns a `VerifiedPrincipal { userId, scopes, principal }` regardless of which Bearer flavor verified the request; adapters build their `Actor` from `verified.principal` once, no branching. Adding a fourth credential type later (signed JWT? mTLS cert?) adds a branch to the union, a column to `audit_log`, and one new `verify*` function — call sites don't change.
+
 ## Audit log: service-layer instrumentation, never adapter-layer
 
 Every state-changing service operation (`createNote`, `updateNote`, `deleteNote`, `createApiKey`, `revokeApiKey`) takes an `Actor = { userId, apiKeyId: string | null }` and writes one row to `audit_log` inside the same transaction as the data write. Adapters (server actions, REST, MCP, CLI) build the Actor from their auth path and pass it through.
@@ -140,13 +146,23 @@ In-process means tools call services directly (no HTTP self-loop). REST and MCP 
 
 `@modelcontextprotocol/sdk` is **pinned to an exact version**, not `^`. The spec is still moving; SDK bumps should be deliberate edits, not side effects of `npm update`.
 
-**Auth model is bearer + manual key paste, not OAuth — for now.** The MCP spec (revision 2025-06-18) defines an OAuth 2.1 flow on top of Streamable HTTP: server returns `401` with `WWW-Authenticate: Bearer realm=...` and authorization metadata, the client opens a browser for interactive consent, the server hands back a token, the client stores it. PayPal's hosted MCP at `mcp.paypal.com/mcp` works this way — `claude mcp add` with no headers is enough.
+**Auth: OAuth 2.1 + PKCE for interactive clients, Bearer keys for CI.** Both paths land at the same `/api/mcp` endpoint and resolve to the same internal `VerifiedPrincipal` shape — adapters don't branch on which authenticator ran.
 
-We chose bearer + a per-user API key in `Settings → API keys` because it's ~150 lines of code we already own (table, hashing, scopes, revocation) and it covers the CI / scripted / power-user case at the same time as interactive Claude Code use. Adding OAuth would mean: an authorization endpoint (delegating to better-auth's session for the consent step), token issuance + refresh, dynamic client registration, an explicit consent UI naming the requested scopes, and the `WWW-Authenticate` dance on `/api/mcp` itself. Real ~200–400 LOC plus a UI, not a 5-minute thing.
+OAuth shipped in Phase 8b. The MCP spec (rev 2025-06-18) prescribes the wire shape: 401 from the resource includes `WWW-Authenticate: Bearer realm=..., resource_metadata=...`, the client follows that to RFC 9728 protected-resource metadata, then to RFC 8414 authorization-server metadata, then drives the standard PKCE flow. End-user setup is one CLI command:
 
-The right destination is **both**: bearer for CI / scripts / "I want to give my coworker read-only access for an hour", OAuth for interactive humans on a fresh machine where copy-pasting keys feels primitive. Project structure is already aligned for it — the MCP route's `requireApiUser(request)` would gain a sibling `requireOauthUser(request)` resolved by the same `assertScopes` downstream. Service layer doesn't change.
+```bash
+claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
+```
 
-Phase 8 candidate. Not on the immediate path; named here so future-us doesn't mistake the current shape for the final shape.
+No headers, no keys. Discovery + dynamic client registration + the consent screen replace the manual paste.
+
+We kept Bearer keys (`cwa_...`) alongside OAuth because they're the right shape for everything that isn't a browser session: CI, cron, "give my coworker read-only access for an hour", clients that don't speak OAuth (Claude Desktop today). Both shapes live in the same service-layer `VerifiedPrincipal` so REST/MCP adapters consume one type. See `docs/OAUTH.md` for the endpoint reference.
+
+**Token shape: opaque + SHA-256 hashed, prefixed.** Not JWTs. We don't run a fleet of resource servers that need offline verification — the only consumer is this app's own DB. Hashed-at-rest matches the `api_key` table; the prefixes (`oat_acc_` access, `oat_rfr_` refresh) make routing in `requireApiUser` a simple `startsWith` check. JWTs would also force a key-management story we don't need yet.
+
+**Public clients only.** No `client_secret` column. PKCE is mandatory (`S256`). DCR is open per the MCP spec, throttled by a per-IP bucket separate from per-credential limits so registration abuse can't drain a real user's budget.
+
+**Refresh tokens rotate atomically.** A single SQL `UPDATE ... SET refresh_token_hash = NULL WHERE id = ? AND refresh_token_hash = <old>` claims the rotation; if `rowCount === 0` another concurrent refresh won and this caller throws `invalid_grant`. No application-level locks, no reuse-detection state machine — just one atomic claim per refresh.
 
 ## Documentation expectations
 

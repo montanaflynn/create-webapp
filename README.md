@@ -84,19 +84,15 @@ Use `--json` on any read verb for clean piping into `jq`. See **`docs/CLI.md`** 
 
 ## Use it from Claude Code (MCP)
 
-Once the dev server is running, you can let Claude Code read and write your notes for you over MCP. Setup is a one-time, three-step thing:
+Once the dev server is running, point Claude Code at the MCP endpoint and it'll handle authentication for you over OAuth — no key copy-paste, no config files.
 
-1. **Make an API key.** Sign in at http://localhost:3000, go to **Settings → API keys**, click **Create**. Name it something like `claude-code`. Leave all three scopes checked (`notes:read`, `notes:write`, `tags:read`). Copy the secret on the reveal banner — you only see it once.
+```bash
+claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
+```
 
-2. **Drop the key into the gitignored slot.** From the repo root:
+Run `/mcp` and pick **create-webapp**. Claude opens your browser; you sign in (passkey, password, whichever you have set up) and click **Authorize** on the consent screen naming the requested scopes. Done — Claude stores the access token and uses it from then on.
 
-   ```bash
-   cp .claude/settings.local.example.json .claude/settings.local.json
-   ```
-
-   Open `.claude/settings.local.json` and replace `cwa_paste_your_key_here` with the secret you just copied.
-
-3. **Restart Claude Code in this repo.** Run `/mcp` — you should see `create-webapp` under **Project MCPs** with status `connected`.
+Need to revoke? **Settings → Connected apps → Revoke**. Token dies immediately.
 
 That's it. Try a prompt:
 
@@ -110,9 +106,15 @@ Claude calls the `notes_list` tool and renders a formatted table. Other things t
 >
 > *List my notes tagged interview*  ← uses the `tag` filter
 
-For read-only research agents, generate a key with only `notes:read` and `tags:read` checked.
+### Bearer key (CI / scripts / Claude Desktop)
 
-**Behind the scenes:** an MCP server is mounted at `POST /api/mcp` inside the Next app (Streamable HTTP transport, same Bearer auth as REST, no separate process to install). The wiring is in committed `.mcp.json` referencing `${CWA_API_KEY}`; the secret lives only in your gitignored `settings.local.json`. See **`docs/MCP.md`** for the full reference (Claude Desktop config, tool list, scope model, OAuth as a future direction).
+For non-interactive use cases (CI jobs, shell scripts, agents on a fresh machine where opening a browser isn't viable, or Claude Desktop which doesn't speak OAuth yet), generate a long-lived API key instead:
+
+1. Sign in, go to **Settings → API keys → Create**, copy the `cwa_...` secret on the reveal banner (shown once).
+2. `cp .claude/settings.local.example.json .claude/settings.local.json` and paste the key into `CWA_API_KEY`. The committed `.mcp.json` already references that env var.
+3. Restart Claude Code, run `/mcp`.
+
+Read-only agents can generate a key with only `notes:read` and `tags:read` checked. See **`docs/MCP.md`** and **`docs/OAUTH.md`** for the full references.
 
 ## Database
 

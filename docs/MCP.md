@@ -2,15 +2,34 @@
 
 Lets agents (Claude Desktop, Claude Code, anything that speaks MCP) use this app's data.
 
-The endpoint is mounted at `POST /api/mcp` inside the Next app — same process, same auth, same scopes as the REST API. There's **no separate process to install or run**. Configuration on the client side is just a URL and a Bearer header.
+The endpoint is mounted at `POST /api/mcp` inside the Next app — same process, same service layer, same scopes as the REST API. There's **no separate process to install or run**.
+
+Two auth paths are supported, in order of preference:
+
+1. **OAuth 2.1 + PKCE** — interactive, browser-based, no key copy-paste. The right shape for end users on fresh machines.
+2. **Bearer API key** — long-lived `cwa_...` token, manually pasted into the client config. The right shape for CI, scripts, and clients (like Claude Desktop) that don't speak OAuth yet.
 
 ---
 
 ## Configure your client
 
-### Claude Code (this repo's default)
+### Claude Code via OAuth (preferred)
 
-The wiring is already in `.mcp.json` at the repo root, project-scoped, committed:
+```bash
+claude mcp add --transport http create-webapp http://localhost:3000/api/mcp
+```
+
+Run `/mcp` and pick **create-webapp**. Claude follows the `WWW-Authenticate` header on the first 401, opens a browser, and the consent screen lists the requested scopes. Authorize → Claude stores the token → you're connected.
+
+**No `Authorization` header in the config.** That's the whole point of OAuth on MCP — discovery + dynamic client registration + the consent flow replace the manual paste.
+
+Revoke at any time from **Settings → Connected apps**. The token dies immediately on the server side.
+
+See **`docs/OAUTH.md`** for the full endpoint reference (discovery URLs, register/authorize/token/revoke).
+
+### Claude Code via Bearer key (CI / scripted use)
+
+The committed `.mcp.json` already wires the Bearer path:
 
 ```jsonc
 // .mcp.json
@@ -25,31 +44,29 @@ The wiring is already in `.mcp.json` at the repo root, project-scoped, committed
 }
 ```
 
-The `${CWA_API_KEY}` placeholder is wiring, not a secret. Each contributor supplies their own key via a gitignored file:
+To activate it:
 
-1. Sign in to the dev app and go to **Settings → API keys → Create**. Give it a name like `claude-code` and leave all three scopes checked. Copy the secret on the one-time reveal panel — it isn't shown again.
+1. **Settings → API keys → Create** in the dev app. Copy the `cwa_...` secret on the reveal banner — it isn't shown again.
 
-2. Copy the example into the gitignored slot:
-
-   ```bash
+2. ```bash
    cp .claude/settings.local.example.json .claude/settings.local.json
    ```
 
-3. Edit `.claude/settings.local.json` and paste the key:
+3. Edit `.claude/settings.local.json`:
 
    ```jsonc
    { "env": { "CWA_API_KEY": "cwa_..." } }
    ```
 
-4. Restart Claude Code (or open a new session in this repo). Run `/mcp` — `create-webapp` should appear under "Project MCPs" with status `connected`.
+4. Restart Claude Code. Run `/mcp` — `create-webapp` should show `connected`.
 
-If it shows `failed: 401`, the env var didn't expand. Most common cause: dev server isn't running, port mismatch (`:3001` vs `:3000`), or the key is for the test database (`./pgdata-test`) instead of dev (`./pgdata`).
+If it shows `failed: 401`, the env var didn't expand. Most common cause: dev server isn't running, port mismatch, or the key is for the test database.
 
-For read-only agents, generate a key with only `notes:read` and `tags:read` checked — the same `.mcp.json` wiring works, the scope just narrows what the tools can do.
+For read-only agents, create a key with only `notes:read` and `tags:read` checked.
 
 ### Claude Desktop
 
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) — paste the key inline since Desktop doesn't read `.claude/settings.local.json`:
+Claude Desktop's MCP client doesn't yet do OAuth, so paste a Bearer key inline at `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ```json
 {
@@ -87,10 +104,10 @@ Errors come back as `isError: true` tool results. The text body is `{ "error": {
 
 The MCP server is **not** a separate process or service:
 
-- `src/app/api/mcp/route.ts` — Next Route Handler. Authenticates via `Authorization: Bearer ...`, builds a per-request `McpServer`, hands the Web `Request` to `WebStandardStreamableHTTPServerTransport`, returns its `Response`.
+- `src/app/api/mcp/route.ts` — Next Route Handler. Authenticates via `Authorization: Bearer ...` (accepts both `cwa_` API keys and `oat_acc_` OAuth access tokens), builds a per-request `McpServer`, hands the Web `Request` to `WebStandardStreamableHTTPServerTransport`, returns its `Response`. Emits `WWW-Authenticate` on 401 so OAuth-aware clients can auto-discover the authorization server.
 - `src/lib/mcp/server.ts` — `buildMcpServer(auth)` registers all six tools. Each tool calls `assertScopes(auth, [...])`, then a service function (`createNote`, `listNotes`, etc.), then returns the result as a tool response.
 
-REST and MCP are **peer adapters** on top of the same service layer. Neither stacks on the other. Same `requireApiUser`, same scope model, same error envelope.
+REST and MCP are **peer adapters** on top of the same service layer. Neither stacks on the other. Same `requireApiUser`, same scope model, same error envelope. The auth layer takes either credential shape and produces the same `VerifiedPrincipal` — adapters don't branch on which authenticator ran.
 
 Stateless mode is on: no session IDs, no in-memory state across requests. Each POST is fully self-contained. That's the right choice for a tool-only server — sessions matter when you're streaming or pushing notifications, neither of which we do.
 
@@ -100,7 +117,9 @@ Stateless mode is on: no session IDs, no in-memory state across requests. Each P
 
 The dev server already serves `/api/mcp` — no extra command. Point your agent at `http://localhost:3000/api/mcp` and it works.
 
-To verify by hand:
+To verify the OAuth path by hand, see `docs/OAUTH.md`.
+
+To verify the Bearer path:
 
 ```bash
 KEY=$(cat tests/e2e/.api-keys.json | jq -r '."test-full"')
@@ -127,34 +146,10 @@ curl -sX POST http://localhost:3000/api/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"notes_list","arguments":{}}}' | jq
 ```
 
-The `tests/e2e/mcp.spec.ts` Playwright suite is the canonical regression coverage — auth, scopes, full CRUD, validation, tag listing.
+The `tests/e2e/mcp.spec.ts` and `tests/e2e/oauth.spec.ts` Playwright suites are the canonical regression coverage — auth, scopes, full CRUD, OAuth flow, validation, tag listing.
 
 ---
 
 ## Versioning
 
 `@modelcontextprotocol/sdk` is **pinned to an exact version** in `package.json`. The MCP spec is still moving; we want bumps to be a deliberate edit, not a side effect of `npm update`. When upgrading: read the SDK changelog, run the e2e suite, update this doc if the wire shape changed.
-
----
-
-## Future direction: OAuth on `/api/mcp`
-
-The MCP spec defines an OAuth 2.1 flow over Streamable HTTP. Instead of pasting a Bearer token, an end-user runs:
-
-```bash
-claude mcp add --transport http create-webapp --scope project http://localhost:3000/api/mcp
-```
-
-…and on first use, Claude Code follows a `WWW-Authenticate` redirect, opens a browser, the user signs in to the app interactively, grants the requested scopes on a consent screen, and Claude Code stores the resulting token. No `${CWA_API_KEY}`, no `.claude/settings.local.json`, no copy-paste.
-
-This is how PayPal's hosted MCP at `mcp.paypal.com/mcp` works — that's why their config snippet doesn't show a header.
-
-We're staying on bearer + manual key for v1 because:
-
-- It's ~150 lines we already own (the `api_key` table, hashing, scopes, revocation UI).
-- It covers CI / scripts / shared-with-coworker-for-an-hour use cases the same way it covers interactive use.
-- OAuth is a real chunk of work — authorization endpoint, token issuance + refresh, dynamic client registration, consent UI, the full `WWW-Authenticate` dance. ~200–400 LOC plus a UI screen, not a 5-minute thing.
-
-The right end state is **both** — bearer for scripts and CI, OAuth for interactive humans on fresh machines where copy-pasting keys feels primitive. The architecture is already shaped for it: `requireApiUser(request)` would gain a sibling `requireOauthUser(request)`, both resolving to the same `VerifiedKey`-shape and feeding into the same `assertScopes` downstream. The service layer wouldn't change.
-
-If you're picking this up: implement on `/api/mcp` first (single endpoint, narrow surface), preserve bearer support throughout, and treat scopes consistently across both auth paths. See DECISIONS for the full rationale.
