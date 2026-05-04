@@ -26,10 +26,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       return jsonError(400, "bad_request", "Request body must be valid JSON.");
     }
     const note = await updateNote(
-      {
-        userId: auth.userId,
-        principal: { kind: "api_key", id: auth.apiKeyId },
-      },
+      { userId: auth.userId, principal: auth.principal },
       id,
       body,
     );
@@ -44,10 +41,7 @@ export async function DELETE(request: Request, ctx: Ctx) {
     const auth = await requireApiUser(request, ["notes:write"]);
     const { id } = await ctx.params;
     await deleteNote(
-      {
-        userId: auth.userId,
-        principal: { kind: "api_key", id: auth.apiKeyId },
-      },
+      { userId: auth.userId, principal: auth.principal },
       id,
     );
     return new Response(null, { status: 204 });

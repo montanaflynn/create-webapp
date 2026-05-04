@@ -55,10 +55,7 @@ export async function POST(request: Request) {
       return jsonError(400, "bad_request", "Request body must be valid JSON.");
     }
     const note = await createNote(
-      {
-        userId: auth.userId,
-        principal: { kind: "api_key", id: auth.apiKeyId },
-      },
+      { userId: auth.userId, principal: auth.principal },
       body,
     );
     return Response.json(serializeNote(note), { status: 201 });

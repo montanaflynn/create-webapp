@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiKey } from "@/lib/db/schema";
-import { recordAudit, type Actor } from "./audit";
+import { recordAudit, type Actor, type Principal } from "./audit";
 import {
   ForbiddenError,
   NotFoundError,
@@ -39,11 +39,18 @@ export type CreatedKey = {
   secret: string;
 };
 
-export type VerifiedKey = {
-  apiKeyId: string;
+// Shared shape returned by every Bearer-credential verifier (`verifyApiKey`,
+// `verifyOauthToken`). Adapters (REST, MCP, CLI) use this exclusively — they
+// build an `Actor = { userId, principal }` for the service layer without
+// caring which authenticator ran.
+export type VerifiedPrincipal = {
   userId: string;
   scopes: Scope[];
+  principal: Principal;
 };
+
+/** @deprecated Use `VerifiedPrincipal`. Kept for ergonomic continuity. */
+export type VerifiedKey = VerifiedPrincipal;
 
 const SECRET_BYTES = 32; // 256 bits of entropy
 const KEY_PREFIX = "cwa_";
@@ -148,7 +155,7 @@ export async function revokeApiKey(actor: Actor, id: string): Promise<void> {
  * not a timing-attack vector. We still use `timingSafeEqual` on the hash bytes
  * for defense in depth.
  */
-export async function verifyApiKey(secret: string): Promise<VerifiedKey> {
+export async function verifyApiKey(secret: string): Promise<VerifiedPrincipal> {
   if (typeof secret !== "string" || !secret.startsWith(KEY_PREFIX)) {
     throw new UnauthenticatedError("Invalid API key.");
   }
@@ -176,19 +183,22 @@ export async function verifyApiKey(secret: string): Promise<VerifiedKey> {
     .catch(() => undefined);
 
   return {
-    apiKeyId: row.id,
     userId: row.userId,
     scopes: filterValidScopes(row.scopes),
+    principal: { kind: "api_key", id: row.id },
   };
 }
 
-/** Throws ForbiddenError if the key lacks any of the required scopes. */
-export function assertScopes(verified: VerifiedKey, required: Scope[]): void {
+/** Throws ForbiddenError if the principal lacks any of the required scopes. */
+export function assertScopes(
+  verified: VerifiedPrincipal,
+  required: Scope[],
+): void {
   const held = new Set(verified.scopes);
   const missing = required.filter((s) => !held.has(s));
   if (missing.length > 0) {
     throw new ForbiddenError(
-      `Key is missing required scope${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
+      `Missing required scope${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`,
     );
   }
 }

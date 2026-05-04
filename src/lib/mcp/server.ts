@@ -3,7 +3,7 @@ import * as z from "zod";
 import {
   assertScopes,
   type Scope,
-  type VerifiedKey,
+  type VerifiedPrincipal,
 } from "@/lib/services/api-keys";
 import {
   ForbiddenError,
@@ -32,7 +32,7 @@ const VERSION = "1.0.0";
  * service layer directly — REST and MCP are peer adapters on top of the same
  * primitives, neither stacked on the other.
  */
-export function buildMcpServer(auth: VerifiedKey): McpServer {
+export function buildMcpServer(auth: VerifiedPrincipal): McpServer {
   const server = new McpServer(
     { name: APP_NAME, version: VERSION },
     {
@@ -105,7 +105,7 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
           await createNote(
             {
               userId: auth.userId,
-              principal: { kind: "api_key", id: auth.apiKeyId },
+              principal: auth.principal,
             },
             args,
           ),
@@ -127,7 +127,7 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
           await updateNote(
             {
               userId: auth.userId,
-              principal: { kind: "api_key", id: auth.apiKeyId },
+              principal: auth.principal,
             },
             id,
             rest,
@@ -149,7 +149,7 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
         await deleteNote(
           {
             userId: auth.userId,
-            principal: { kind: "api_key", id: auth.apiKeyId },
+            principal: auth.principal,
           },
           id,
         );
@@ -181,7 +181,7 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
  * content (clients that don't support structuredContent fall back to text).
  */
 async function run<T>(
-  auth: VerifiedKey,
+  auth: VerifiedPrincipal,
   scopes: Scope[],
   body: () => Promise<T>,
 ) {

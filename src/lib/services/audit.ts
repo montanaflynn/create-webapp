@@ -25,10 +25,12 @@ export type AuditAction =
   | "note.update"
   | "note.delete"
   | "api_key.create"
-  | "api_key.revoke";
+  | "api_key.revoke"
+  | "oauth.consent"
+  | "oauth.token.revoke";
 
 export type AuditResource = {
-  type: "note" | "api_key";
+  type: "note" | "api_key" | "oauth_token";
   id: string;
   metadata?: Record<string, unknown>;
 };
@@ -44,10 +46,13 @@ export async function recordAudit(
 ): Promise<void> {
   const apiKeyId =
     actor.principal.kind === "api_key" ? actor.principal.id : null;
+  const oauthTokenId =
+    actor.principal.kind === "oauth_token" ? actor.principal.id : null;
   await conn.insert(auditLog).values({
     id: crypto.randomUUID(),
     userId: actor.userId,
     apiKeyId,
+    oauthTokenId,
     principalKind: actor.principal.kind,
     action,
     resourceType: resource.type,

@@ -25,7 +25,11 @@ export const dynamic = "force-dynamic";
 async function handle(request: Request): Promise<Response> {
   let auth;
   try {
-    auth = await requireApiUser(request);
+    // `challenge: true` makes 401 responses include a WWW-Authenticate header
+    // that points OAuth-aware MCP clients at /.well-known/oauth-protected-resource
+    // for discovery. Bearer-only clients (CLIs that already paste a key) just
+    // see a plain 401.
+    auth = await requireApiUser(request, [], { challenge: true });
   } catch (e) {
     return mapError(e);
   }

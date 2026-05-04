@@ -39,7 +39,17 @@ export function jsonError(
  */
 export function mapError(e: unknown): Response {
   if (e instanceof UnauthenticatedError) {
-    return jsonError(401, "unauthenticated", e.message);
+    const headers: Record<string, string> = {};
+    // When `requireApiUser` is called with `{ challenge: true }` (e.g. from
+    // /api/mcp) it tags the error with a `challenge` flag so we can emit
+    // RFC 9728-style WWW-Authenticate pointing the client at the
+    // protected-resource metadata. MCP-spec OAuth discovery starts here.
+    if ((e as { challenge?: boolean }).challenge) {
+      const base = process.env.BETTER_AUTH_URL ?? "";
+      headers["WWW-Authenticate"] =
+        `Bearer realm="create-webapp", resource_metadata="${base}/.well-known/oauth-protected-resource"`;
+    }
+    return jsonError(401, "unauthenticated", e.message, undefined, headers);
   }
   if (e instanceof ForbiddenError) {
     return jsonError(403, "forbidden", e.message);
