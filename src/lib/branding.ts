@@ -7,7 +7,16 @@
  */
 export const APP_NAME = "create-webapp";
 export const APP_DESCRIPTION =
-  "Next.js + better-auth + Drizzle + shadcn starter";
+  "Next.js + better-auth + Drizzle + shadcn + api + mcp + cli + more";
+
+/**
+ * Lowercased, hyphenated slug derived from APP_NAME. Used as the default
+ * MCP server name in setup commands (e.g. `claude mcp add ... opennotes`),
+ * directory-safe identifiers, etc. Edit APP_NAME and this updates.
+ */
+export const APP_SLUG = APP_NAME.toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");
 
 /**
  * Social links shown in the footer. Set to an empty string to hide a link;
