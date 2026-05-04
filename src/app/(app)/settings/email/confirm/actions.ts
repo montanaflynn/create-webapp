@@ -51,7 +51,7 @@ export async function confirmEmailChangeAction(formData: FormData) {
       .where(eq(pendingEmailChange.id, row.id));
   });
 
-  redirect("/settings?email-changed=1");
+  redirect("/settings/profile?email-changed=1");
 }
 
 export async function cancelEmailChangeAction() {
@@ -60,5 +60,5 @@ export async function cancelEmailChangeAction() {
   await db
     .delete(pendingEmailChange)
     .where(eq(pendingEmailChange.userId, session.user.id));
-  redirect("/settings?email-cancelled=1");
+  redirect("/settings/profile?email-cancelled=1");
 }

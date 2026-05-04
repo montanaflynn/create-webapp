@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 test("api key lifecycle: create, reveal once, revoke", async ({ page }) => {
-  await page.goto("/settings");
-  await expect(page.getByText("API keys", { exact: true })).toBeVisible();
+  await page.goto("/settings/api-keys");
+  await expect(page.getByLabel("Key name")).toBeVisible();
 
   // CREATE — fill form and submit
   const name = `e2e-${Date.now()}`;
@@ -36,7 +36,7 @@ test("api key lifecycle: create, reveal once, revoke", async ({ page }) => {
 });
 
 test("blocks creating a key with no scopes", async ({ page }) => {
-  await page.goto("/settings");
+  await page.goto("/settings/api-keys");
 
   const name = `no-scopes-${Date.now()}`;
   await page.getByLabel("Key name").fill(name);

@@ -24,7 +24,7 @@ test("REST note creation appears in /settings audit log with key source", async 
   });
   expect(create.status()).toBe(201);
 
-  await page.goto("/settings");
+  await page.goto("/settings/activity");
   await expect(page.getByText("Activity log")).toBeVisible();
 
   // The row should mention "created note" and the title from metadata.
@@ -46,7 +46,7 @@ test("UI-driven note creation logs Web session as source", async ({
 
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
 
-  await page.goto("/settings");
+  await page.goto("/settings/activity");
   const row = page.locator("tr").filter({ hasText: title });
   await expect(row).toBeVisible();
   await expect(row.getByText("Web session")).toBeVisible();

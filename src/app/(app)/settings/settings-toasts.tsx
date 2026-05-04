@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 // Reads ?email-changed=1 / ?email-cancelled=1 from the URL after
@@ -15,15 +15,16 @@ export function SettingsToasts({
   emailCancelled: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   useEffect(() => {
     if (emailChanged) {
       toast.success("Email changed");
-      router.replace("/settings");
+      router.replace(pathname);
     } else if (emailCancelled) {
       toast.success("Email change cancelled");
-      router.replace("/settings");
+      router.replace(pathname);
     }
     // emailChanged/emailCancelled flip at most once per render; safe deps.
-  }, [emailChanged, emailCancelled, router]);
+  }, [emailChanged, emailCancelled, router, pathname]);
   return null;
 }
