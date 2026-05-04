@@ -6,6 +6,7 @@ import { db } from "./db";
 import * as schema from "./db/schema";
 import { pendingEmailChange } from "./db/schema";
 import { sendMail } from "./mailer";
+import { APP_NAME } from "./branding";
 import {
   resetPasswordTemplate,
   verifyEmailTemplate,
@@ -73,7 +74,7 @@ export const auth = betterAuth({
       // Both are derived from BETTER_AUTH_URL so dev (localhost) and prod work
       // without extra env wiring.
       rpID: rpFromUrl(process.env.BETTER_AUTH_URL).id,
-      rpName: "create-webapp",
+      rpName: APP_NAME,
       origin: rpFromUrl(process.env.BETTER_AUTH_URL).origin,
     }),
   ],

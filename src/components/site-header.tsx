@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/branding";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,7 +71,7 @@ export function SiteHeader({ user }: { user: HeaderUser | null }) {
           href="/"
           className="font-semibold tracking-tight whitespace-nowrap"
         >
-          create-webapp
+          {APP_NAME}
         </Link>
         {user ? <SignedInActions user={user} /> : <SignedOutActions />}
       </div>

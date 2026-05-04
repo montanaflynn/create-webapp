@@ -117,6 +117,173 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ----- base color presets (neutral palette) ----- */
+/* `neutral` is the default and lives in :root / .dark above. */
+
+:root[data-base="zinc"] {
+  --foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+}
+.dark[data-base="zinc"] {
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+}
+
+:root[data-base="slate"] {
+  --foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+}
+.dark[data-base="slate"] {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+}
+
+:root[data-base="stone"] {
+  --foreground: oklch(0.147 0.004 49.25);
+  --card-foreground: oklch(0.147 0.004 49.25);
+  --popover-foreground: oklch(0.147 0.004 49.25);
+  --secondary: oklch(0.97 0.001 106.424);
+  --secondary-foreground: oklch(0.216 0.006 56.043);
+  --muted: oklch(0.97 0.001 106.424);
+  --muted-foreground: oklch(0.553 0.013 58.071);
+  --accent: oklch(0.97 0.001 106.424);
+  --accent-foreground: oklch(0.216 0.006 56.043);
+  --border: oklch(0.923 0.003 48.717);
+  --input: oklch(0.923 0.003 48.717);
+}
+.dark[data-base="stone"] {
+  --background: oklch(0.147 0.004 49.25);
+  --foreground: oklch(0.985 0.001 106.423);
+  --card: oklch(0.216 0.006 56.043);
+  --card-foreground: oklch(0.985 0.001 106.423);
+  --popover: oklch(0.216 0.006 56.043);
+  --popover-foreground: oklch(0.985 0.001 106.423);
+  --secondary: oklch(0.268 0.007 34.298);
+  --secondary-foreground: oklch(0.985 0.001 106.423);
+  --muted: oklch(0.268 0.007 34.298);
+  --muted-foreground: oklch(0.709 0.01 56.259);
+  --accent: oklch(0.268 0.007 34.298);
+  --accent-foreground: oklch(0.985 0.001 106.423);
+}
+
+:root[data-base="gray"] {
+  --foreground: oklch(0.13 0.028 261.692);
+  --card-foreground: oklch(0.13 0.028 261.692);
+  --popover-foreground: oklch(0.13 0.028 261.692);
+  --secondary: oklch(0.967 0.003 264.542);
+  --secondary-foreground: oklch(0.21 0.034 264.665);
+  --muted: oklch(0.967 0.003 264.542);
+  --muted-foreground: oklch(0.551 0.027 264.364);
+  --accent: oklch(0.967 0.003 264.542);
+  --accent-foreground: oklch(0.21 0.034 264.665);
+  --border: oklch(0.928 0.006 264.531);
+  --input: oklch(0.928 0.006 264.531);
+}
+.dark[data-base="gray"] {
+  --background: oklch(0.13 0.028 261.692);
+  --foreground: oklch(0.985 0.002 247.839);
+  --card: oklch(0.21 0.034 264.665);
+  --card-foreground: oklch(0.985 0.002 247.839);
+  --popover: oklch(0.21 0.034 264.665);
+  --popover-foreground: oklch(0.985 0.002 247.839);
+  --secondary: oklch(0.278 0.033 256.848);
+  --secondary-foreground: oklch(0.985 0.002 247.839);
+  --muted: oklch(0.278 0.033 256.848);
+  --muted-foreground: oklch(0.707 0.022 261.325);
+  --accent: oklch(0.278 0.033 256.848);
+  --accent-foreground: oklch(0.985 0.002 247.839);
+}
+
+/* ----- accent presets ----- */
+/* zinc is the default and lives in :root / .dark above. */
+
+:root[data-accent="indigo"] {
+  --primary: oklch(0.511 0.262 276.966);
+  --ring: oklch(0.511 0.262 276.966);
+  --sidebar-primary: oklch(0.511 0.262 276.966);
+}
+.dark[data-accent="indigo"] {
+  --primary: oklch(0.673 0.182 276.935);
+  --ring: oklch(0.673 0.182 276.935);
+  --sidebar-primary: oklch(0.511 0.262 276.966);
+}
+
+:root[data-accent="blue"] {
+  --primary: oklch(0.546 0.215 262.881);
+  --ring: oklch(0.546 0.215 262.881);
+  --sidebar-primary: oklch(0.546 0.215 262.881);
+}
+.dark[data-accent="blue"] {
+  --primary: oklch(0.707 0.165 254.624);
+  --ring: oklch(0.707 0.165 254.624);
+  --sidebar-primary: oklch(0.546 0.215 262.881);
+}
+
+:root[data-accent="rose"] {
+  --primary: oklch(0.586 0.253 17.585);
+  --ring: oklch(0.586 0.253 17.585);
+  --sidebar-primary: oklch(0.586 0.253 17.585);
+}
+.dark[data-accent="rose"] {
+  --primary: oklch(0.712 0.194 13.428);
+  --ring: oklch(0.712 0.194 13.428);
+  --sidebar-primary: oklch(0.586 0.253 17.585);
+}
+
+:root[data-accent="green"] {
+  --primary: oklch(0.627 0.194 149.214);
+  --ring: oklch(0.627 0.194 149.214);
+  --sidebar-primary: oklch(0.627 0.194 149.214);
+}
+.dark[data-accent="green"] {
+  --primary: oklch(0.723 0.219 149.579);
+  --ring: oklch(0.723 0.219 149.579);
+  --sidebar-primary: oklch(0.627 0.194 149.214);
+}
+
+/* ----- radius presets ----- */
+/* `default` is the value baked into :root above (0.625rem). */
+:root[data-radius="sharp"]  { --radius: 0.25rem; }
+:root[data-radius="round"]  { --radius: 1rem; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

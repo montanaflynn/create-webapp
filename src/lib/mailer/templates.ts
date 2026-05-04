@@ -1,4 +1,5 @@
 import type { MailKind } from "./index";
+import { APP_NAME } from "@/lib/branding";
 
 interface RenderedMail {
   subject: string;
@@ -7,8 +8,6 @@ interface RenderedMail {
   kind: MailKind;
   meta: Record<string, unknown>;
 }
-
-const APP_NAME = "create-webapp";
 
 function layout(title: string, body: string) {
   return `<!doctype html><html><body style="font:14px/1.5 ui-sans-serif,system-ui;color:#111;max-width:560px;margin:24px auto;padding:0 16px"><h1 style="font-size:18px;margin:0 0 16px">${title}</h1>${body}<p style="color:#888;margin-top:24px;font-size:12px">${APP_NAME}</p></body></html>`;

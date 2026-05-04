@@ -23,8 +23,8 @@ import {
 import { listTagsWithCounts } from "@/lib/services/tags";
 import { noteInputSchema } from "@/lib/notes-schema";
 import { serializeNote, serializeTag } from "@/lib/api/response";
+import { APP_NAME } from "@/lib/branding";
 
-const NAME = "create-webapp";
 const VERSION = "1.0.0";
 
 /**
@@ -34,7 +34,7 @@ const VERSION = "1.0.0";
  */
 export function buildMcpServer(auth: VerifiedKey): McpServer {
   const server = new McpServer(
-    { name: NAME, version: VERSION },
+    { name: APP_NAME, version: VERSION },
     {
       instructions:
         "Tools manipulate the authenticated user's notes and tags. Every tool requires a scoped API key: notes:read for reads, notes:write for writes, tags:read for tags.",
