@@ -1,6 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { apiKey, auditLog } from "@/lib/db/schema";
+import { apiKey, auditLog, oauthClient, oauthToken } from "@/lib/db/schema";
 import {
   Card,
   CardContent,
@@ -17,6 +17,8 @@ const ACTION_LABELS: Record<string, string> = {
   "note.delete": "deleted note",
   "api_key.create": "created API key",
   "api_key.revoke": "revoked API key",
+  "oauth.consent": "authorized app",
+  "oauth.token.revoke": "revoked OAuth access",
 };
 
 const LIMIT = 50;
@@ -25,6 +27,8 @@ type AuditRow = {
   principalKind: string;
   apiKeyId: string | null;
   apiKeyName: string | null;
+  oauthTokenId: string | null;
+  oauthClientName: string | null;
 };
 
 function renderSource(r: AuditRow) {
@@ -34,17 +38,22 @@ function renderSource(r: AuditRow) {
     case "api_key":
       return (
         <Badge variant="secondary">
-          key: {r.apiKeyName ?? r.apiKeyId?.slice(0, 8) ?? "(revoked)"}
+          key: {truncate(r.apiKeyName ?? r.apiKeyId?.slice(0, 8) ?? "(revoked)")}
         </Badge>
       );
     case "oauth_token":
-      // Phase 8b will replace this with a real client name lookup once the
-      // oauth_token table exists. The CHECK constraint prevents any row from
-      // landing here in 8a, but TypeScript still wants this branch.
-      return <Badge variant="secondary">oauth: (pending)</Badge>;
+      return (
+        <Badge variant="secondary">
+          oauth: {truncate(r.oauthClientName ?? r.oauthTokenId?.slice(0, 8) ?? "(revoked)")}
+        </Badge>
+      );
     default:
       return <Badge variant="outline">{r.principalKind}</Badge>;
   }
+}
+
+function truncate(s: string, max = 24): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 export async function AuditLogSection({ userId }: { userId: string }) {
@@ -59,9 +68,13 @@ export async function AuditLogSection({ userId }: { userId: string }) {
       principalKind: auditLog.principalKind,
       apiKeyId: auditLog.apiKeyId,
       apiKeyName: apiKey.name,
+      oauthTokenId: auditLog.oauthTokenId,
+      oauthClientName: oauthClient.name,
     })
     .from(auditLog)
     .leftJoin(apiKey, eq(auditLog.apiKeyId, apiKey.id))
+    .leftJoin(oauthToken, eq(auditLog.oauthTokenId, oauthToken.id))
+    .leftJoin(oauthClient, eq(oauthToken.clientId, oauthClient.id))
     .where(eq(auditLog.userId, userId))
     .orderBy(desc(auditLog.createdAt))
     .limit(LIMIT);

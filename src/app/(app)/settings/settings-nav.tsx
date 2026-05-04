@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/settings/profile", label: "Profile" },
   { href: "/settings/security", label: "Security" },
   { href: "/settings/api-keys", label: "API keys" },
+  { href: "/settings/oauth-clients", label: "Connected apps" },
   { href: "/settings/activity", label: "Activity" },
 ];
 
