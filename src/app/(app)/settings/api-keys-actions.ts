@@ -4,16 +4,17 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import * as apiKeys from "@/lib/services/api-keys";
+import type { Actor } from "@/lib/services/audit";
 import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "@/lib/services/errors";
 
-async function requireUserId() {
+async function requireActor(): Promise<Actor> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) throw new Error("Unauthorized");
-  return session.user.id;
+  return { userId: session.user.id, apiKeyId: null };
 }
 
 export type SerializedApiKey = {
@@ -36,9 +37,9 @@ export async function createKey(input: {
   name: string;
   scopes: string[];
 }): Promise<CreateKeyResult> {
-  const userId = await requireUserId();
+  const actor = await requireActor();
   try {
-    const { key, secret } = await apiKeys.createApiKey(userId, {
+    const { key, secret } = await apiKeys.createApiKey(actor, {
       name: input.name,
       // Service filters out anything that isn't a known scope.
       scopes: input.scopes as apiKeys.Scope[],
@@ -54,9 +55,9 @@ export async function createKey(input: {
 }
 
 export async function revokeKey(id: string): Promise<RevokeKeyResult> {
-  const userId = await requireUserId();
+  const actor = await requireActor();
   try {
-    await apiKeys.revokeApiKey(userId, id);
+    await apiKeys.revokeApiKey(actor, id);
     revalidatePath("/settings");
     return { ok: true };
   } catch (e) {

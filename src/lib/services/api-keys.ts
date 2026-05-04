@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { apiKey } from "@/lib/db/schema";
+import { recordAudit, type Actor } from "./audit";
 import {
   ForbiddenError,
   NotFoundError,
@@ -51,7 +52,7 @@ const MAX_NAME_LENGTH = 80;
 const MAX_KEYS_PER_USER = 50;
 
 export async function createApiKey(
-  userId: string,
+  actor: Actor,
   input: { name: string; scopes: Scope[] },
 ): Promise<CreatedKey> {
   const name = input.name?.trim() ?? "";
@@ -71,7 +72,7 @@ export async function createApiKey(
   const existing = await db
     .select({ id: apiKey.id })
     .from(apiKey)
-    .where(and(eq(apiKey.userId, userId), isNull(apiKey.revokedAt)));
+    .where(and(eq(apiKey.userId, actor.userId), isNull(apiKey.revokedAt)));
   if (existing.length >= MAX_KEYS_PER_USER) {
     throw new ForbiddenError(
       `Limit of ${MAX_KEYS_PER_USER} active keys reached. Revoke one before creating another.`,
@@ -82,17 +83,25 @@ export async function createApiKey(
   const hash = sha256(secret);
   const id = crypto.randomUUID();
 
-  const [row] = await db
-    .insert(apiKey)
-    .values({
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(apiKey)
+      .values({
+        id,
+        userId: actor.userId,
+        name,
+        prefix: secret.slice(0, VISIBLE_PREFIX_LENGTH),
+        hash,
+        scopes,
+      })
+      .returning();
+    await recordAudit(tx, actor, "api_key.create", {
+      type: "api_key",
       id,
-      userId,
-      name,
-      prefix: secret.slice(0, VISIBLE_PREFIX_LENGTH),
-      hash,
-      scopes,
-    })
-    .returning();
+      metadata: { name, scopes },
+    });
+    return inserted;
+  });
 
   return { key: toApiKey(row), secret };
 }
@@ -111,15 +120,22 @@ export async function listApiKeys(userId: string): Promise<ApiKey[]> {
   });
 }
 
-export async function revokeApiKey(userId: string, id: string): Promise<void> {
-  const result = await db
-    .update(apiKey)
-    .set({ revokedAt: new Date() })
-    .where(
-      and(eq(apiKey.id, id), eq(apiKey.userId, userId), isNull(apiKey.revokedAt)),
-    )
-    .returning({ id: apiKey.id });
-  if (result.length === 0) throw new NotFoundError("api_key", id);
+export async function revokeApiKey(actor: Actor, id: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const result = await tx
+      .update(apiKey)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(
+          eq(apiKey.id, id),
+          eq(apiKey.userId, actor.userId),
+          isNull(apiKey.revokedAt),
+        ),
+      )
+      .returning({ id: apiKey.id });
+    if (result.length === 0) throw new NotFoundError("api_key", id);
+    await recordAudit(tx, actor, "api_key.revoke", { type: "api_key", id });
+  });
 }
 
 /**

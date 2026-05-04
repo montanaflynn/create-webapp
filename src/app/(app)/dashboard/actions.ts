@@ -4,20 +4,21 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import type { Actor } from "@/lib/services/audit";
 import * as notes from "@/lib/services/notes";
 import { NotFoundError, ValidationError } from "@/lib/services/errors";
 import type { NoteInput } from "@/lib/notes-schema";
 
-async function requireUserId() {
+async function requireActor(): Promise<Actor> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) throw new Error("Unauthorized");
-  return session.user.id;
+  return { userId: session.user.id, apiKeyId: null };
 }
 
 export async function createNote(input: NoteInput) {
-  const userId = await requireUserId();
+  const actor = await requireActor();
   try {
-    await notes.createNote(userId, input);
+    await notes.createNote(actor, input);
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
     throw e;
@@ -27,9 +28,9 @@ export async function createNote(input: NoteInput) {
 }
 
 export async function updateNote(id: string, input: NoteInput) {
-  const userId = await requireUserId();
+  const actor = await requireActor();
   try {
-    await notes.updateNote(userId, id, input);
+    await notes.updateNote(actor, id, input);
   } catch (e) {
     if (e instanceof ValidationError) return { error: e.message };
     // Bail silently if the note didn't exist or wasn't owned by this user —
@@ -42,9 +43,9 @@ export async function updateNote(id: string, input: NoteInput) {
 }
 
 export async function deleteNote(id: string) {
-  const userId = await requireUserId();
+  const actor = await requireActor();
   try {
-    await notes.deleteNote(userId, id);
+    await notes.deleteNote(actor, id);
   } catch (e) {
     // Idempotent from the caller's perspective.
     if (!(e instanceof NotFoundError)) throw e;

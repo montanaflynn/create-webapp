@@ -9,6 +9,7 @@ import { ProfileForm } from "./profile-form";
 import { PasswordForm } from "./password-form";
 import { PasskeysForm } from "./passkeys-form";
 import { ApiKeysForm } from "./api-keys-form";
+import { AuditLogSection } from "./audit-log";
 import { SettingsToasts } from "./settings-toasts";
 
 export default async function SettingsPage({
@@ -90,6 +91,7 @@ export default async function SettingsPage({
             revokedAt: k.revokedAt ? k.revokedAt.toISOString() : null,
           }))}
         />
+        <AuditLogSection userId={session.user.id} />
       </div>
     </>
   );

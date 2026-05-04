@@ -101,7 +101,12 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
     },
     async (args) =>
       run(auth, ["notes:write"], async () =>
-        serializeNote(await createNote(auth.userId, args)),
+        serializeNote(
+          await createNote(
+            { userId: auth.userId, apiKeyId: auth.apiKeyId },
+            args,
+          ),
+        ),
       ),
   );
 
@@ -115,7 +120,13 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
     },
     async ({ id, ...rest }) =>
       run(auth, ["notes:write"], async () =>
-        serializeNote(await updateNote(auth.userId, id, rest)),
+        serializeNote(
+          await updateNote(
+            { userId: auth.userId, apiKeyId: auth.apiKeyId },
+            id,
+            rest,
+          ),
+        ),
       ),
   );
 
@@ -129,7 +140,10 @@ export function buildMcpServer(auth: VerifiedKey): McpServer {
     },
     async ({ id }) =>
       run(auth, ["notes:write"], async () => {
-        await deleteNote(auth.userId, id);
+        await deleteNote(
+          { userId: auth.userId, apiKeyId: auth.apiKeyId },
+          id,
+        );
         return { id, deleted: true };
       }),
   );

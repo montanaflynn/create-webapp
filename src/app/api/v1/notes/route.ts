@@ -54,7 +54,10 @@ export async function POST(request: Request) {
     } catch {
       return jsonError(400, "bad_request", "Request body must be valid JSON.");
     }
-    const note = await createNote(auth.userId, body);
+    const note = await createNote(
+      { userId: auth.userId, apiKeyId: auth.apiKeyId },
+      body,
+    );
     return Response.json(serializeNote(note), { status: 201 });
   } catch (e) {
     return mapError(e);

@@ -57,6 +57,13 @@
       "when": 1777848244486,
       "tag": "0007_fine_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777904815130,
+      "tag": "0008_smiling_nicolaos",
+      "breakpoints": true
     }
   ]
 }

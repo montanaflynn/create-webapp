@@ -176,6 +176,33 @@ export const apiKey = pgTable(
   ],
 );
 
+// State-changing actions across every adapter (server actions, REST, MCP, CLI)
+// land here. `apiKeyId` is null for cookie-session writes, set for Bearer-token
+// writes — the FK uses ON DELETE SET NULL so revoking a key never destroys its
+// audit trail. `metadata` is freeform JSON for per-action context (e.g.
+// `{ fields: ["title"] }` on an update).
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    apiKeyId: text("api_key_id").references(() => apiKey.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_log_user_id_idx").on(t.userId),
+    index("audit_log_created_at_idx").on(t.createdAt),
+  ],
+);
+
 // One row per user with a pending email-change verification. Lets /settings
 // show "change to X pending — cancel" without re-querying better-auth's
 // internal verification table, and lets our custom confirmation page look up

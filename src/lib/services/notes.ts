@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { note, noteTag, tag } from "@/lib/db/schema";
 import { noteInputSchema, type NoteInput } from "@/lib/notes-schema";
+import { recordAudit, type Actor } from "./audit";
 import { NotFoundError, ValidationError } from "./errors";
 
 export type Note = {
@@ -121,22 +122,29 @@ export async function getNote(userId: string, id: string): Promise<Note> {
 }
 
 export async function createNote(
-  userId: string,
+  actor: Actor,
   input: unknown,
 ): Promise<Note> {
   const { title, content, tags } = parseAndNormalize(input);
   const noteId = crypto.randomUUID();
 
   await db.transaction(async (tx) => {
-    await tx.insert(note).values({ id: noteId, userId, title, content });
-    if (tags.length > 0) await upsertTagsAndLink(tx, userId, noteId, tags);
+    await tx
+      .insert(note)
+      .values({ id: noteId, userId: actor.userId, title, content });
+    if (tags.length > 0) await upsertTagsAndLink(tx, actor.userId, noteId, tags);
+    await recordAudit(tx, actor, "note.create", {
+      type: "note",
+      id: noteId,
+      metadata: { title, tagCount: tags.length },
+    });
   });
 
-  return getNote(userId, noteId);
+  return getNote(actor.userId, noteId);
 }
 
 export async function updateNote(
-  userId: string,
+  actor: Actor,
   id: string,
   input: unknown,
 ): Promise<Note> {
@@ -146,29 +154,37 @@ export async function updateNote(
     const updated = await tx
       .update(note)
       .set({ title, content, updatedAt: new Date() })
-      .where(and(eq(note.id, id), eq(note.userId, userId)))
+      .where(and(eq(note.id, id), eq(note.userId, actor.userId)))
       .returning({ id: note.id });
 
     if (updated.length === 0) return false;
 
     // Replace links wholesale — simpler than diffing, atomic inside the tx.
     await tx.delete(noteTag).where(eq(noteTag.noteId, id));
-    if (tags.length > 0) await upsertTagsAndLink(tx, userId, id, tags);
+    if (tags.length > 0) await upsertTagsAndLink(tx, actor.userId, id, tags);
+    await recordAudit(tx, actor, "note.update", {
+      type: "note",
+      id,
+      metadata: { title, tagCount: tags.length },
+    });
     return true;
   });
 
   if (!ok) throw new NotFoundError("note", id);
-  return getNote(userId, id);
+  return getNote(actor.userId, id);
 }
 
-export async function deleteNote(userId: string, id: string): Promise<void> {
+export async function deleteNote(actor: Actor, id: string): Promise<void> {
   // note_tag rows cascade via FK; tag rows are intentionally preserved so the
   // user's autocomplete vocabulary survives note deletion.
-  const result = await db
-    .delete(note)
-    .where(and(eq(note.id, id), eq(note.userId, userId)))
-    .returning({ id: note.id });
-  if (result.length === 0) throw new NotFoundError("note", id);
+  await db.transaction(async (tx) => {
+    const result = await tx
+      .delete(note)
+      .where(and(eq(note.id, id), eq(note.userId, actor.userId)))
+      .returning({ id: note.id });
+    if (result.length === 0) throw new NotFoundError("note", id);
+    await recordAudit(tx, actor, "note.delete", { type: "note", id });
+  });
 }
 
 // ---------------------------------------------------------------------------
