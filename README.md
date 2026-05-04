@@ -69,6 +69,19 @@ curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/v1/notes
 
 Keys are issued per-user and carry one or more scopes (`notes:read`, `notes:write`, `tags:read`). The service layer (`src/lib/services/`) is the single source of truth — server actions, REST handlers, and the MCP server all sit on top of the same functions.
 
+## CLI
+
+`scripts/cli.ts` mirrors the REST API as a one-file `tsx` script. Set `CWA_API_KEY` (and optionally `CWA_BASE_URL`), then:
+
+```bash
+export CWA_API_KEY=cwa_...
+npm run cli -- notes list
+npm run cli -- notes create --title "Hi" --content "There" --tag greeting --json
+npm run cli -- tags list
+```
+
+Use `--json` on any read verb for clean piping into `jq`. See **`docs/CLI.md`** for the full reference.
+
 ## Use it from Claude Code (MCP)
 
 Once the dev server is running, you can let Claude Code read and write your notes for you over MCP. Setup is a one-time, three-step thing:
