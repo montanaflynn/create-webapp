@@ -1,6 +1,7 @@
 import {
   ForbiddenError,
   NotFoundError,
+  RateLimitedError,
   UnauthenticatedError,
   ValidationError,
 } from "@/lib/services/errors";
@@ -20,6 +21,7 @@ export function jsonError(
   code: string,
   message: string,
   details?: unknown,
+  headers?: Record<string, string>,
 ): Response {
   const body: ApiError = {
     error: {
@@ -28,7 +30,7 @@ export function jsonError(
       ...(details !== undefined ? { details } : {}),
     },
   };
-  return Response.json(body, { status });
+  return Response.json(body, { status, headers });
 }
 
 /**
@@ -48,6 +50,11 @@ export function mapError(e: unknown): Response {
   if (e instanceof ValidationError) {
     return jsonError(422, "validation_failed", e.message, {
       issues: e.issues,
+    });
+  }
+  if (e instanceof RateLimitedError) {
+    return jsonError(429, "rate_limited", e.message, undefined, {
+      "Retry-After": String(e.retryAfter),
     });
   }
   console.error("[api] unhandled error:", e);

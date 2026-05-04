@@ -40,3 +40,11 @@ export class ForbiddenError extends Error {
     this.name = "ForbiddenError";
   }
 }
+
+/** The caller is exceeding their rate budget. HTTP 429 + Retry-After header. */
+export class RateLimitedError extends Error {
+  constructor(public readonly retryAfter: number, message = "Rate limit exceeded") {
+    super(message);
+    this.name = "RateLimitedError";
+  }
+}

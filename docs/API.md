@@ -44,9 +44,14 @@ Every non-2xx response has the same envelope:
 | 403  | `forbidden`          | Authenticated but key lacks the required scope          |
 | 404  | `not_found`          | Resource doesn't exist or isn't owned by this user      |
 | 422  | `validation_failed`  | Body parsed but failed schema validation                |
+| 429  | `rate_limited`       | Per-key bucket exhausted. Includes `Retry-After` header in seconds. |
 | 500  | `internal_error`     | Server bug. Logged server-side; please report           |
 
 Validation errors include `details.issues: [{ path: string[], message: string }]` so clients can show field-level errors.
+
+### Rate limits
+
+Each API key has its own token bucket: 60 burst, 10 requests/sec sustained (defaults; override with `CWA_RATE_LIMIT_BURST` / `CWA_RATE_LIMIT_PER_SECOND`). Cookie-session traffic from the dashboard is not counted — only Bearer-authenticated requests. Exhausted buckets return `429 rate_limited` with a `Retry-After` header.
 
 ---
 

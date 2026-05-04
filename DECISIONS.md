@@ -110,6 +110,26 @@ The template is API-first by construction: every domain operation lives in `src/
 
 **Last-used-at is fire-and-forget.** `verifyApiKey` updates `api_key.last_used_at` without awaiting — the auth check passed, the request shouldn't fail because of a bookkeeping write. Strict awaiting moves to Phase 7's audit log, where a missed row would actually matter.
 
+## Audit log: service-layer instrumentation, never adapter-layer
+
+Every state-changing service operation (`createNote`, `updateNote`, `deleteNote`, `createApiKey`, `revokeApiKey`) takes an `Actor = { userId, apiKeyId: string | null }` and writes one row to `audit_log` inside the same transaction as the data write. Adapters (server actions, REST, MCP, CLI) build the Actor from their auth path and pass it through.
+
+This is the lever the API-first architecture pays off on. If audit-log instrumentation lived in adapters, every new entry point would need to remember to log; with services as the single insertion point, every adapter gets coverage for free, and "did this surface forget to log?" stops being a question.
+
+`apiKeyId` is null for cookie-session writes. The FK uses `ON DELETE SET NULL` so revoking a key never destroys its trail. Reads are intentionally not audited — read frequency dwarfs writes, and "who looked at what" is observability, a different concern with different storage shape.
+
+## Rate limit: in-memory token bucket, per API key
+
+`requireApiUser` consumes one token per request after verifying the key. Bucket defaults: 60 burst, 10 req/s sustained, tunable via `CWA_RATE_LIMIT_BURST` and `CWA_RATE_LIMIT_PER_SECOND`. Cookie-session traffic isn't rate-limited — better-auth's session middleware already protects abuse paths there, and locking the user out of their own dashboard because their MCP integration went haywire would be the wrong shape.
+
+Per-key, not per-user, on purpose: one bad script shouldn't lock the user out of every other key they own. The `RateLimiter` interface exists for the day in-memory state stops being acceptable (multi-process deploys, persistent ban lists); a postgres- or redis-backed implementation drops in at the singleton without changing call sites. In-memory is fine for v1 — rate limiting is friction protection, not a security boundary.
+
+## CLI: single-file `tsx`, no Commander
+
+`scripts/cli.ts` is ~280 lines using only `node:util` `parseArgs` and `fetch`. No Commander, yargs, or oclif. The surface is small enough that arg-parsing isn't the bottleneck, and avoiding the dependency keeps the CLI easy to read end-to-end on one screen.
+
+The CLI is a pure adapter on top of `/api/v1/*`. It doesn't import services, doesn't add scopes, doesn't bypass auth. Every request goes through `Authorization: Bearer $CWA_API_KEY` exactly like a curl invocation would. That's the whole point of having an API-first shape: another entry point is mechanical, not architectural.
+
 ## MCP: HTTP route, not a separate process
 
 The MCP server is mounted at `/api/mcp` inside the Next app, using `WebStandardStreamableHTTPServerTransport` from `@modelcontextprotocol/sdk`. Stateless mode (`sessionIdGenerator: undefined`) with `enableJsonResponse: true`.
