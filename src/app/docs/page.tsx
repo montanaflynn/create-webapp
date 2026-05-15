@@ -110,7 +110,9 @@ export default function DocsIndexPage() {
                       >
                         <CardHeader>
                           <CardTitle>{page.title}</CardTitle>
-                          <CardDescription>{page.description}</CardDescription>
+                          <CardDescription className="text-foreground/75">
+                            {page.description}
+                          </CardDescription>
                         </CardHeader>
                       </Card>
                     </Link>
@@ -133,7 +135,7 @@ export default function DocsIndexPage() {
               >
                 <item.icon className="mb-3" aria-hidden />
                 <div className="font-medium">{item.title}</div>
-                <div className="mt-1 text-muted-foreground">
+                <div className="mt-1 text-foreground/75">
                   {item.description}
                 </div>
               </Link>
