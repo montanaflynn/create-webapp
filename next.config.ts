@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   // Override .next/ via env so the playwright test server can run alongside
   // the dev server — Next 16's dev lockfile lives in distDir/dev/.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  async rewrites() {
+    return [
+      {
+        source: "/docs/:slug.md",
+        destination: "/docs/:slug/markdown",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

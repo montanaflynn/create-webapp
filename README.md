@@ -83,6 +83,7 @@ The application code (`src/lib/data` if added, server actions, pages) is identic
 | `/dashboard/notes/[id]/edit`    | Edit form (shared `NoteEditor`); save redirects back to the read view                     |
 | `/tags`                         | Index of every tag the user has used, with note counts; links into `/dashboard?tag=…`     |
 | `/settings`                     | Profile name + password forms                                                             |
+| `/docs`                         | AI-native docs index with per-page Markdown, copy actions, and agent prompts               |
 | `/api/auth/[...all]`            | better-auth handler                                                                       |
 | `/api/v1/notes`                 | REST: `GET` (list with `?tag&sort&dir&page&pageSize`), `POST` (create). Bearer-token auth |
 | `/api/v1/notes/[id]`            | REST: `GET`, `PATCH`, `DELETE`. Bearer-token auth                                         |
@@ -190,6 +191,18 @@ For non-interactive use cases (CI jobs, shell scripts, agents on a fresh machine
 3. Restart the client, run its MCP-list command (`/mcp` in Claude Code).
 
 Read-only agents can generate a key with only `notes:read` and `tags:read` checked. See **`docs/MCP.md`** and **`docs/OAUTH.md`** for the full references.
+
+## AI-native docs
+
+The app includes a public docs website at `/docs` for the notes product: using notes and tags, managing account/security, connecting MCP clients, using the REST API, and operating admin/deploy surfaces. It is intentionally built for both humans and coding agents:
+
+- `/docs/:slug` — readable docs page with copy buttons for Markdown, agent prompts, and Codex/Cursor/Claude launch commands
+- `/docs/:slug.md` — the same page as `text/markdown`
+- `/llms.txt` — concise curated docs index for agents
+- `/llms-full.txt` — full bundled Markdown docs
+- `/docs.json` — structured manifest of docs pages and Markdown URLs
+
+The docs content lives in `src/lib/docs/content.ts` so the rendered pages, Markdown endpoints, LLM files, and manifest all come from the same source.
 
 ## Database
 
