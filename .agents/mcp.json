@@ -1,0 +1,16 @@
+{
+  "$schema": "./mcp.schema.json",
+  "_doc": "Canonical MCP server registry. Run `npm run agents:link` to generate per-tool configs (.mcp.json, .codex/config.toml, .gemini/settings.json, .cursor/mcp.json, opencode.json).",
+  "servers": {
+    "shadcn": {
+      "description": "shadcn registry — component docs and add commands",
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    },
+    "create-webapp": {
+      "description": "This app's own MCP server (notes + tags). Uses OAuth.",
+      "url": "http://localhost:3000/api/mcp",
+      "auth": "oauth"
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agents MCP Registry",
+  "description": "Canonical MCP server registry for cross-agent linking. Read by scripts/agents-link.ts.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "_doc": { "type": "string" },
+    "servers": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/server" }
+    }
+  },
+  "required": ["servers"],
+  "definitions": {
+    "server": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "command": { "type": "string", "description": "Stdio: executable to spawn" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Literal env vars for the spawned process (stdio only)."
+        },
+        "url": { "type": "string", "description": "HTTP/SSE: server URL" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "HTTP headers (HTTP only)."
+        },
+        "auth": {
+          "enum": ["none", "oauth", "bearer"],
+          "description": "HTTP only. 'oauth' = let each tool's OAuth flow drive. 'bearer' requires bearerEnvVar."
+        },
+        "bearerEnvVar": {
+          "type": "string",
+          "description": "Name of env var holding the bearer token. Used when auth='bearer'."
+        },
+        "targets": {
+          "type": "array",
+          "items": { "enum": ["claude", "codex", "gemini", "cursor", "opencode"] },
+          "description": "Optional whitelist of tools to emit this server for. Default: all."
+        }
+      },
+      "oneOf": [
+        { "required": ["command"], "not": { "required": ["url"] } },
+        { "required": ["url"], "not": { "required": ["command"] } }
+      ]
+    }
+  }
+}
