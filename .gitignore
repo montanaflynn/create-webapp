@@ -58,6 +58,7 @@ opencode.json
 /.next-test
 /test-results
 /playwright-report
+/.playwright-mcp
 /playwright/.cache
 /tests/e2e/.auth
 /tests/e2e/.api-keys.json
