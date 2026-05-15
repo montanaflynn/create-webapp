@@ -36,7 +36,12 @@ export function SocialLinks() {
             size="icon"
             nativeButton={false}
             render={
-              <a href={SOCIALS[key]} target="_blank" rel="noreferrer" />
+              <a
+                href={SOCIALS[key]}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`${label} (opens in a new tab)`}
+              />
             }
           >
             <svg

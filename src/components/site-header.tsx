@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
+  BookOpenIcon,
   LogOutIcon,
   Monitor,
   Moon,
@@ -39,6 +40,7 @@ type HeaderUser = {
 };
 
 const baseNav = [
+  { title: "Docs", href: "/docs", icon: BookOpenIcon },
   { title: "Notes", href: "/dashboard", icon: NotebookIcon },
   { title: "Tags", href: "/tags", icon: TagIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
@@ -49,8 +51,6 @@ const adminNav = {
   href: "/admin/users",
   icon: ShieldIcon,
 } as const;
-
-const AUTH_PATHS = new Set(["/sign-in", "/sign-up", "/reset-password"]);
 
 function initialsOf(name: string) {
   return (
@@ -116,12 +116,14 @@ function SignedInActions({ user }: { user: HeaderUser }) {
 }
 
 function SignedOutActions() {
-  const pathname = usePathname();
-  // On auth pages themselves, the sign-in/up CTAs would just self-link.
-  if (AUTH_PATHS.has(pathname)) return null;
-
   return (
     <div className="ml-auto flex items-center gap-2">
+      <Link
+        href="/docs"
+        className={buttonVariants({ variant: "ghost", size: "sm" })}
+      >
+        Docs
+      </Link>
       <Link
         href="/sign-in"
         className={buttonVariants({ variant: "ghost", size: "sm" })}

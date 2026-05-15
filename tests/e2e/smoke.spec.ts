@@ -7,6 +7,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test("sign in lands on dashboard", async ({ page }) => {
   await page.goto("/sign-in");
 
+  await expect(page.getByRole("link", { name: "Docs" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get started" })).toBeVisible();
+
   await page.getByLabel("Email").fill("user@example.com");
   await page.getByLabel("Password").fill("password@123");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
