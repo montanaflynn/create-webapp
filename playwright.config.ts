@@ -12,11 +12,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: [["list"]],
+  reporter: [["list"], ["html", { open: "never" }]],
   globalSetup: "./tests/e2e/global-setup.ts",
   use: {
     baseURL: BASE_URL,
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   projects: [
     {
@@ -38,6 +40,8 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 120_000,
+    stdout: "pipe",
+    stderr: "pipe",
     env: {
       DATABASE_URL: "./pgdata-test",
       BETTER_AUTH_URL: BASE_URL,
